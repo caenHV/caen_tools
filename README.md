@@ -38,6 +38,25 @@ Python module containing:
 * List of available tickets
 * Implementation of the tickets
 
+## Requirements
+Tested on `python==3.11.2` with extra modules described in `requirements.txt`
+
+## Running
+
+* Add project root folder in PYTHONPATH with
+```bash
+source env.sh
+```
+* Run `DeviceBackend` by
+```bash
+python DeviceBackend/back.py
+```
+* Run `WebService` (in another bash) by
+```bash
+python WebService/ws.py
+```
+
+
 ## Helpful links
 * [ZMQ Guide](https://zguide.zeromq.org/)
 * [ZMQ Socket API](https://zeromq.org/socket-api/)
