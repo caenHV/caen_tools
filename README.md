@@ -51,10 +51,11 @@ source env.sh
 ```bash
 python DeviceBackend/back.py
 ```
-* Run `WebService` (in another bash) by
+* Run `WebService` (in another bash) by `python WebService/ws.py` to execute a random number of SetVoltage tickets or 
 ```bash
-python WebService/ws.py
+uvicorn WebService.ws:app --reload
 ```
+to deploy webserver
 
 
 ## Helpful links

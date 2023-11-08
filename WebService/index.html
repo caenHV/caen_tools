@@ -1,0 +1,24 @@
+<button id="ping">Ping</button>
+
+<script>
+
+    ping.onclick = async () => {
+        try {
+            const ticket_type = 'Ping';
+            const response = await fetch(`/set_ticket/${ticket_type}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json;charset=utf-8'
+                },
+                body: JSON.stringify({})
+            });
+            const data = await response.json();
+            console.log(response);
+            console.log(data);
+            alert(JSON.stringify(data));
+        }
+        catch (err) {
+            console.log(err);
+        }
+    };
+</script>

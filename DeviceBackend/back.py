@@ -12,6 +12,7 @@ def main():
     handler = Handler()
     context = zmq.Context()
     socket = context.socket(zmq.REP)
+    socket.setsockopt(zmq.RCVHWM, 1)
     # socket.connect("tcp://localhost:5560")
 
     socket.bind("tcp://*:5559")

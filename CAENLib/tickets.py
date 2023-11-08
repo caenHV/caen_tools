@@ -46,9 +46,22 @@ class Monitor(Ticket):
         return [{p: idx} for idx, p in enumerate(self.params)]
 
 
+class Ping(Ticket):
+    """Empty ticket to ping the device"""
+
+    description = {"name": "Ping", "args": {}}
+
+    def __init__(self):
+        pass
+
+    def execute(self, handler):
+        return {"status": "success"}
+
+
 class Tickets(Enum):
     SET_VOLTAGE = SetVoltage
     MONITOR = Monitor
+    PING = Ping
 
     @staticmethod
     def serialize(ticket_obj):

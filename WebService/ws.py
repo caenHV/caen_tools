@@ -1,9 +1,16 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
 
 from CAENLib.tickets import Tickets, SetVoltage
-from CAENLib.client import Client
+from CAENLib.client import Client, AsyncClient
 
 app = FastAPI()
+cli = AsyncClient("tcp://localhost:5559", 20)
+
+
+@app.get("/")
+async def read_root():
+    return FileResponse("WebService/index.html")
 
 
 @app.get("/list_tickets")
@@ -15,10 +22,13 @@ def read_list_tickets():
 
 
 @app.post("/set_ticket/{name}")
-def post_ticket(name):
+async def post_ticket(name: str, ticket_args: Request = None):
     """[WS Backend API] Sends ticket on the setup"""
-    # TODO
-    return {"status": "success", "ticket": name}
+    args_dict = await ticket_args.json() if ticket_args else {}
+    tkt = {"name": name, "args": args_dict}
+    print(f"Query ticket: {tkt}")
+    resp = await cli.query(tkt)
+    return resp
 
 
 def post_tickets(cli, num):
@@ -33,7 +43,7 @@ def post_tickets(cli, num):
 def main():
     from random import randint
 
-    idx = randint(0, 100)
+    idx = randint(1, 100)
     print(f"Send {idx} messages")
 
     cli = Client("tcp://localhost:5559")
