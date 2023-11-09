@@ -13,9 +13,9 @@ def main():
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.setsockopt(zmq.RCVHWM, 1)
-    # socket.connect("tcp://localhost:5560")
+    socket.connect("tcp://localhost:5560")
 
-    socket.bind("tcp://*:5559")
+    # socket.bind("tcp://*:5559")
     print("REP Socket HWM", socket.get_hwm())
 
     while True:
