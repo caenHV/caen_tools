@@ -22,12 +22,12 @@ Conceptual implementation of the architecture for CAEN control
 ### ProxyService
 Proxy Queue to forward tickets to `DeviceBackend`
 * Manipulates with JSON ticket representations
-* `WebService` / `MonitorService` → `ProxyService` → `DeviceBackend`
+* `WebService` / `MonitorService` / `ConsoleClient` → `ProxyService` → `DeviceBackend`
 * Has `PUB` socket output for every proxying message
 
 ### DeviceBackend
-Recieves JSON tickets and executes them
-
+* Recieves JSON tickets and executes them
+* Uses `caen_setup` module
 
 ### MonitorService
 Sends special `MonitorTicket` to the `DeviceBackend`, recieves parameters of the device and manipulates them.
@@ -38,10 +38,15 @@ Alternative for WebService for setting tickets (from console)
 > *Note*:
 > in future, seems, we can add ssh tunneling (for zmq) and enable remote managing 
 
-### CAENLib
+### CAENLib (obsolete)
 Python module containing:
 * List of available tickets
 * Implementation of the tickets
+
+> *Note:* in future we will use tickets from `caen_setup` and reject CAENLib
+
+### connection
+Python class wrappers for client and server
 
 ## Requirements
 Tested on `python==3.11.2` with extra modules described in `requirements.txt`

@@ -1,10 +1,34 @@
+from abc import ABC
 import zmq
 import zmq.asyncio
 from zmq.utils import jsonapi
 
 
-class AsyncClient:
-    """
+class BaseClient(ABC):
+    """Abstract parent for (sync and async) client classes"""
+
+    def __init__(self, context, socket_type, receive_time=None):
+        self.context = context
+        self.recv_time = receive_time
+        self.socket = self.context.socket(socket_type)
+        self.__configure_context()
+
+    def __configure_context(self):
+        self.context.setsockopt(zmq.SNDTIMEO, 1000)
+        self.context.setsockopt(zmq.SNDHWM, 1000)
+        self.context.setsockopt(zmq.LINGER, 0)
+        if self.recv_time:
+            self.socket.setsockopt(zmq.RCVTIMEO, self.recv_time * 1000)
+
+    def __del__(self):
+        self.socket.setsockopt(zmq.LINGER, 0)
+        self.socket.close()
+        self.context.term()
+
+
+class AsyncClient(BaseClient):
+    """Async client class implementation (for WebService and so on)
+
     Parameters
     ----------
     connect_addr: str
@@ -14,24 +38,15 @@ class AsyncClient:
     """
 
     def __init__(self, connect_addr: str, receive_time: int | None = None):
-        # zmq.COPY_THRESHOLD = 0 # need to ensure copy=False messages
+        context = zmq.asyncio.Context()
         self.connect_addr = connect_addr
-        self.context = zmq.asyncio.Context()
-        self.socket = self.context.socket(zmq.DEALER)
-        # self.socket.connect(connect_addr)
-        self.socket.setsockopt(zmq.SNDTIMEO, 1000)
-        self.socket.setsockopt(zmq.SNDHWM, 1000)
-        self.socket.setsockopt(zmq.LINGER, 0)
-        if receive_time:
-            self.socket.setsockopt(zmq.RCVTIMEO, receive_time * 1000)
-        print("Socket HWM", self.socket.get_hwm())  # = 1
+        super().__init__(context, zmq.DEALER, receive_time)
 
     async def query(self, jsobj):
         obj = jsonapi.dumps(jsobj)
 
         with self.socket.connect(self.connect_addr) as sock:
             await sock.send_multipart([b"", obj])
-            # await sock.send_json(jsobj)
 
             try:
                 # response_proxy = await self.socket.recv_multipart()
@@ -44,14 +59,10 @@ class AsyncClient:
 
         return responsejs
 
-    def __del__(self):
-        self.socket.setsockopt(zmq.LINGER, 0)
-        self.socket.close()
-        self.context.term()
 
+class SyncClient(BaseClient):
+    """Sync client class implementation (for ConsoleClient and so on)
 
-class Client:
-    """
     Parameters
     ----------
     connect_addr: str
@@ -61,18 +72,14 @@ class Client:
     """
 
     def __init__(self, connect_addr: str, receive_time: int | None = None):
-        # zmq.COPY_THRESHOLD = 0 # need to ensure copy=False messages
-        self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.DEALER)
+        context = zmq.Context()
         self.connect_addr = connect_addr
-        # self.socket.connect(connect_addr)
-        if receive_time:
-            self.socket.setsockopt(zmq.RCVTIMEO, receive_time * 1000)
-        print("Socket HWM", self.socket.get_hwm())  # = 1
+        super().__init__(context, zmq.DEALER, receive_time)
 
     def query(self, jsobj):
+        obj = jsonapi.dumps(jsobj)
+
         with self.socket.connect(self.connect_addr) as sock:
-            obj = jsonapi.dumps(jsobj)
             sock.send_multipart([b"", obj])
 
             # response_proxy = self.socket.recv_multipart()
@@ -81,8 +88,3 @@ class Client:
             response: list = sock.recv_multipart()
             responsejs = jsonapi.loads(response[1])
         return responsejs
-
-    def __del__(self):
-        self.socket.setsockopt(zmq.LINGER, 0)
-        self.socket.close()
-        self.context.term()

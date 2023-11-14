@@ -1,6 +1,6 @@
 import argparse
 from caen_tools.CAENLib.tickets import Tickets
-from caen_tools.CAENLib.client import Client
+from caen_tools.connection.client import SyncClient
 
 SERVADDR = "tcp://localhost:5559"
 
@@ -34,7 +34,7 @@ def main():
     args = parser.parse_args()
 
     tkt_json = jsonify_tkt(args)
-    cli = Client(connect_addr=SERVADDR)
+    cli = SyncClient(connect_addr=SERVADDR)
     resp = cli.query(tkt_json)
 
     print("RESPONSE", resp)

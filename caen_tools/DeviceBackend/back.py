@@ -1,7 +1,7 @@
 import time
 
 from caen_tools.CAENLib.tickets import Tickets
-from caen_tools.DeviceBackend.server import DeviceBackendServer
+from caen_tools.connection.server import DeviceBackendServer
 
 
 class Handler:
