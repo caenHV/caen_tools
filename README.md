@@ -35,6 +35,9 @@ Sends special `MonitorTicket` to the `DeviceBackend`, recieves parameters of the
 ### ConsoleClient
 Alternative for WebService for setting tickets (from console)
 
+> *Note*:
+> in future, seems, we can add ssh tunneling (for zmq) and enable remote managing 
+
 ### CAENLib
 Python module containing:
 * List of available tickets
@@ -59,8 +62,15 @@ uvicorn WebService.ws:app --reload
 ```
 to deploy webserver
 
+## Final view
+Finally this project must be installed easily via pip like
+
+```pip install caen-tools[web,console-cli]```
 
 ## Helpful links
 * [ZMQ Guide](https://zguide.zeromq.org/)
 * [ZMQ Socket API](https://zeromq.org/socket-api/)
 * [PyZMQ API](https://pyzmq.readthedocs.io/en/latest/api/zmq.html)
+* [Install package from git](https://github.com/pypa/pip/issues/6548)
+* [Git submodules](https://git-scm.com/book/ru/v2/%D0%98%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BC%D0%B5%D0%BD%D1%82%D1%8B-Git-%D0%9F%D0%BE%D0%B4%D0%BC%D0%BE%D0%B4%D1%83%D0%BB%D0%B8)
+* [PIP extra dependencies](https://setuptools.pypa.io/en/latest/userguide/dependency_management.html)

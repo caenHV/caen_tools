@@ -1,0 +1,6 @@
+[project]
+name="caen-tools"
+version="0.0.1"
+dependencies=[
+    "fastapi",
+]

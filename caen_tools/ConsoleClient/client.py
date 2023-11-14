@@ -1,6 +1,6 @@
 import argparse
-from CAENLib.tickets import Tickets
-from CAENLib.client import Client
+from caen_tools.CAENLib.tickets import Tickets
+from caen_tools.CAENLib.client import Client
 
 SERVADDR = "tcp://localhost:5559"
 
