@@ -32,6 +32,8 @@ Recieves JSON tickets and executes them
 ### MonitorService
 Sends special `MonitorTicket` to the `DeviceBackend`, recieves parameters of the device and manipulates them.
 
+### ConsoleClient
+Alternative for WebService for setting tickets (from console)
 
 ### CAENLib
 Python module containing:

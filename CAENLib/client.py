@@ -31,6 +31,7 @@ class AsyncClient:
 
         with self.socket.connect(self.connect_addr) as sock:
             await sock.send_multipart([b"", obj])
+            # await sock.send_json(jsobj)
 
             try:
                 # response_proxy = await self.socket.recv_multipart()

@@ -17,6 +17,8 @@ class Ticket(abc.ABC):
 
 
 class SetVoltage(Ticket):
+    """Ticket for setting voltage on device"""
+
     description = {
         "name": "SetVoltage",
         "args": {
@@ -32,6 +34,8 @@ class SetVoltage(Ticket):
 
 
 class Monitor(Ticket):
+    """Monitor ticket to control device state"""
+
     description = {
         "name": "Monitor",
         "args": {

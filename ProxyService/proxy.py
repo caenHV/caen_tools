@@ -34,7 +34,7 @@ def main():
 
         if socks.get(frontend) == zmq.POLLIN:
             message = frontend.recv_multipart()
-            frontend.send_multipart(message)
+            # frontend.send_multipart(message)
             print(f"PROXY: RCV -> message {message}")
             backend.send_multipart(message)
 
