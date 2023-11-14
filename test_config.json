@@ -1,0 +1,14 @@
+{
+    "board_address0" : {
+        "conet" : 1,
+        "link" : 1
+    },
+    "board_address1" : {
+        "conet" : 1,
+        "link" : 1
+    },
+    "board_address2" : {
+        "conet" : 1,
+        "link" : 1
+    }
+}

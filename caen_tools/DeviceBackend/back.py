@@ -1,15 +1,10 @@
-import time
+from caen_setup import Handler
 
 from caen_tools.CAENLib.tickets import Tickets
 from caen_tools.connection.server import DeviceBackendServer
 
 
-class Handler:
-    def __init__(self):
-        self.handler = 10
-
-
-handler = Handler()
+handler = Handler("./test_config.json", dev_mode=True)
 
 
 def main():
