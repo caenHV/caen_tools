@@ -1,17 +1,19 @@
 import argparse
-from caen_tools.CAENLib.tickets import Tickets
+# from caen_tools.CAENLib.tickets import Tickets
+from caen_setup import TicketType
 from caen_tools.connection.client import SyncClient
 
 SERVADDR = "tcp://localhost:5559"
 
 
-def list_available_tickets():
-    return [t.value for t in Tickets]
+def list_available_tickets() -> list:
+    # return [t.value for t in Tickets]
+    return [t.value for t in TicketType]
 
 
 def jsonify_tkt(args):
     argsdict = vars(args)
-    tkt_json = {"name": argsdict.pop("name"), "args": argsdict}
+    tkt_json = {"name": argsdict.pop("name"), "params": argsdict}
     return tkt_json
 
 
@@ -26,8 +28,8 @@ def main():
     )
     spr = dict()
     for ticket in list_available_tickets():
-        name, args = ticket.description["name"], ticket.description["args"]
-        spr[name] = subparsers.add_parser(name, help=ticket.__doc__.lower())
+        name, args = ticket.type_description().name, ticket.type_description().args
+        spr[name] = subparsers.add_parser(name, help=ticket.__doc__)
         for key, value in args.items():
             spr[name] = spr[name].add_argument(f"{key}", help=f"{key}: {value}")
 

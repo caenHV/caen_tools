@@ -36,5 +36,13 @@ class DeviceBackendServer:
     def recv_json(self) -> list:
         return self.socket.recv_json()
 
+    def recv_json_str(self) -> str:
+        data = self.socket.recv()
+        return data.decode("utf8")
+
     def send_json(self, data) -> None:
         return self.socket.send_json(data)
+
+    def send_json_str(self, data: str) -> None:
+        data_js = data.encode("utf8")
+        return self.socket.send(data_js)

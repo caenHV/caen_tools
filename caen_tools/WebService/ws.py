@@ -30,7 +30,7 @@ async def startup():
 
 @app.get("/")
 async def read_root():
-    return FileResponse("WebService/index.html")
+    return FileResponse("caen_tools/WebService/index.html")
 
 
 @app.get("/list_tickets")

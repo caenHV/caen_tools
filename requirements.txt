@@ -1,6 +1,6 @@
 annotated-types==0.6.0
 anyio==3.7.1
-caen-setup @ git+ssh://git@github.com/caenHV/Setup.git@aa2853add0c7d60d0df6db3e715d4086d08beb3d
+caen-setup @ git+ssh://git@github.com/caenHV/Setup.git@b361fcaffc0d1dbd14f445f91092e07748f06b21
 click==8.1.7
 fastapi==0.104.1
 greenlet==3.0.1
