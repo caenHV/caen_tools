@@ -4,3 +4,8 @@ version="0.0.1"
 dependencies=[
     "fastapi",
 ]
+
+[project.scripts]
+caen_device_backend = "caen_tools.DeviceBackend.back:main"
+caen_proxy = "caen_tools.ProxyService.proxy:main"
+caen_client = "caen_tools.ConsoleClient.client:main"

@@ -3,7 +3,7 @@ import asyncio
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 
-from caen_tools.CAENLib.tickets import Tickets, SetVoltage
+from caen_tools.CAENLib.tickets import Tickets
 from caen_tools.connection.client import AsyncClient
 
 QMAXSIZE = 10
