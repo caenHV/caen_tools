@@ -3,7 +3,7 @@ import asyncio
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 
-from caen_tools.CAENLib.tickets import Tickets
+from caen_setup.Tickets.TicketType import TicketType
 from caen_tools.connection.client import AsyncClient
 
 QMAXSIZE = 10
@@ -37,7 +37,7 @@ async def read_root():
 def read_list_tickets():
     """[WS Backend API] Returns a list of available tickets"""
 
-    data = [t.value.description for t in Tickets]
+    data = [(t.value.type_description().__dict__) for t in TicketType]
     return data
 
 
@@ -45,7 +45,7 @@ def read_list_tickets():
 async def post_ticket(name: str, ticket_args: Request = None):
     """[WS Backend API] Sends ticket on the setup"""
     args_dict = await ticket_args.json() if ticket_args else {}
-    tkt_json = {"name": name, "args": args_dict}
+    tkt_json = {"name": name, "params": args_dict}
     print(f"Query ticket: {tkt_json}")
     await queue.put(tkt_json)
     return {"status": "registered"}
