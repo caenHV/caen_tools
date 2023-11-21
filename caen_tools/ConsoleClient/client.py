@@ -1,4 +1,5 @@
 import argparse
+
 # from caen_tools.CAENLib.tickets import Tickets
 from caen_setup import TicketType
 from caen_tools.connection.client import SyncClient
@@ -12,7 +13,8 @@ def list_available_tickets() -> list:
 
 
 def jsonify_tkt(args):
-    argsdict = vars(args)
+    argsdict = vars(args).copy()
+    argsdict.pop("address")
     tkt_json = {"name": argsdict.pop("name"), "params": argsdict}
     return tkt_json
 
@@ -23,8 +25,17 @@ def main():
         description="This client can execute your ticket without WebService",
         epilog="Enjoy!",
     )
+    parser.add_argument(
+        "-a",
+        "--address",
+        nargs="?",
+        default=SERVADDR,
+        help=f"proxy address (default {SERVADDR})",
+    )
     subparsers = parser.add_subparsers(
-        help="Available tickets to execute:", dest="name"
+        help="Available tickets to execute:",
+        dest="name",
+        required=True,
     )
     spr = dict()
     for ticket in list_available_tickets():
@@ -34,9 +45,10 @@ def main():
             spr[name] = spr[name].add_argument(f"{key}", help=f"{key}: {value}")
 
     args = parser.parse_args()
+    # print(args)
 
     tkt_json = jsonify_tkt(args)
-    cli = SyncClient(connect_addr=SERVADDR)
+    cli = SyncClient(connect_addr=args.address)
     resp = cli.query(tkt_json)
 
     print("RESPONSE", resp)
