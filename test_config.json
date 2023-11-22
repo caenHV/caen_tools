@@ -1,31 +1,31 @@
 {
-    "board_address0" : {
+    "0000" : {
         "conet" : 1,
-        "link" : 1,
+        "link" : 0,
         "channels_by_layer" : {
             "1" : [1, 2, 3],
             "2" : [4, 5, 6]
         }
     },
-    "board_address1" : {
+    "2000" : {
         "conet" : 1,
-        "link" : 1,
+        "link" : 0,
         "channels_by_layer" : {
             "3" : [1, 2, 3],
             "4" : [4, 5, 6]
         }
     },
-    "board_address2" : {
+    "1000" : {
         "conet" : 1,
-        "link" : 1,
+        "link" : 0,
         "channels_by_layer" : {
             "5" : [1, 2, 3],
             "6" : [4, 5, 6]
         }
     },
-    "board_address3" : {
+    "3210" : {
         "conet" : 1,
-        "link" : 1,
+        "link" : 0,
         "channels_by_layer" : {
             "5" : [1, 2, 3],
             "6" : [4, 5, 6]
