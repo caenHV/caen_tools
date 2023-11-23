@@ -3,6 +3,7 @@ import argparse
 # from caen_tools.CAENLib.tickets import Tickets
 from caen_setup import TicketType
 from caen_tools.connection.client import SyncClient
+from caen_tools.connection.listener import Listener
 
 SERVADDR = "tcp://localhost:5559"
 
@@ -44,12 +45,23 @@ def main():
         for key, value in args.items():
             spr[name] = spr[name].add_argument(f"{key}", help=f"{key}: {value}")
 
-    args = parser.parse_args()
-    # print(args)
+    spr["Listener"] = subparsers.add_parser("Listener", help="listen proxy")
 
-    tkt_json = jsonify_tkt(args)
-    cli = SyncClient(connect_addr=args.address)
-    resp = cli.query(tkt_json)
+    args = parser.parse_args()
+
+    if args.name == "Listener":
+        lsn = Listener(connect_addr="tcp://localhost:5561")
+        resp = ""
+        while True:
+            try:
+                resp = lsn.recv_msg()
+                print(resp)
+            except KeyboardInterrupt:
+                break
+    else:
+        tkt_json = jsonify_tkt(args)
+        cli = SyncClient(connect_addr=args.address)
+        resp = cli.query(tkt_json)
 
     print("RESPONSE", resp)
     return resp
