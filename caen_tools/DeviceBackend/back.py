@@ -4,7 +4,7 @@ from caen_setup.Tickets.TicketMaster import TicketMaster
 from caen_tools.connection.server import DeviceBackendServer
 
 
-handler = Handler("./test_config.json", dev_mode=True)
+# handler = Handler("./test_config.json", dev_mode=True)
 
 
 def main():

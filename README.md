@@ -38,28 +38,23 @@ Alternative for WebService for setting tickets (from console)
 > *Note*:
 > in future, seems, we can add ssh tunneling (for zmq) and enable remote managing 
 
-### CAENLib (obsolete)
+### connection
+Python class wrappers for client and server
+
+### [caen_setup](https://github.com/caenHV/Setup)
 Python module containing:
 * List of available tickets
 * Implementation of the tickets
-
-> *Note:* in future we will use tickets from `caen_setup` and reject CAENLib
-
-### connection
-Python class wrappers for client and server
+* Setup interaction
 
 ## Requirements
 Tested on `python==3.11.2` with extra modules described in `requirements.txt`
 
 ## Running
 
-* Add project root folder in PYTHONPATH with
+* Build module via pip
 ```bash
-source env.sh
-```
-* Run `DeviceBackend` by
-```bash
-python DeviceBackend/back.py
+pip install -e .
 ```
 * Run `WebService` (in another bash) by `python WebService/ws.py` to execute a random number of SetVoltage tickets or 
 ```bash
