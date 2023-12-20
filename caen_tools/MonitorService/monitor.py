@@ -20,7 +20,7 @@ class Monitor:
     @staticmethod
     def get_results(dbpath: str, start_time: int = 0):
         con = sqlite3.connect(dbpath)
-        res = con.execute("SELECT channel, voltage, t FROM data WHERE t > ? ORDER BY idx DESC", (start_time, )).fetchall()
+        res = con.execute("SELECT channel, voltage, t FROM data WHERE t > datetime(?, 'unixepoch') ORDER BY idx DESC", (start_time, )).fetchall()
         con.close()
         res_data = [{'chidx': chidx, 'v': voltage, 't': t} for (chidx, voltage, t) in res]
         return res_data
@@ -54,7 +54,7 @@ def main():
     while True:
         try:
             m.add_row()
-            time.sleep(5)
+            time.sleep(60)
         except KeyboardInterrupt:
             break
     return
