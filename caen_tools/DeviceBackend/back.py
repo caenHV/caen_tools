@@ -4,7 +4,7 @@ from caen_setup.Tickets.TicketMaster import TicketMaster
 from caen_tools.connection.server import DeviceBackendServer
 
 
-# handler = Handler("./test_config.json", dev_mode=True)
+handler = Handler("./test_config.json", dev_mode=True)
 
 
 def main():
@@ -17,8 +17,7 @@ def main():
 
         tkt_obj = TicketMaster.deserialize(tkt_json)
         print(f"Recieved {tkt_obj}... ", end="")
-        # status = tkt_obj.execute(handler)
-        status = {"status": "ok"}
+        status = tkt_obj.execute(handler)
         print(f"and send status {status} back")
         dbs.send_json(status)
 

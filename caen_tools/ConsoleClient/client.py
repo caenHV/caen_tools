@@ -1,4 +1,6 @@
 import argparse
+import getpass
+import socket
 
 # from caen_tools.CAENLib.tickets import Tickets
 from caen_setup import TicketType
@@ -21,6 +23,7 @@ def jsonify_tkt(args):
 
 
 def main():
+    user, host = getpass.getuser(), socket.gethostname()
     parser = argparse.ArgumentParser(
         prog="Console client for tickets execution",
         description="This client can execute your ticket without WebService",
