@@ -41,6 +41,17 @@ def read_list_tickets():
     return data
 
 
+@app.get("/params")
+def read_parameters(time):
+    """[WS Backend API] Returns Monitor information"""
+
+    from caen_tools.MonitorService.monitor import Monitor
+
+    mon_db = "./monitor.db"
+    res = Monitor.get_results(mon_db, start_time=time)
+    return res
+
+
 @app.post("/set_ticket/{name}")
 async def post_ticket(name: str, ticket_args: Request = None):
     """[WS Backend API] Sends ticket on the setup"""

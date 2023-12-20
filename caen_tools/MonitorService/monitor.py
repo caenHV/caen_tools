@@ -18,8 +18,12 @@ class Monitor:
         self.con.execute("CREATE TABLE IF NOT EXISTS data (idx INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, voltage REAL, t TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
 
     @staticmethod
-    def get_results(dbpath: str, num_points: int = None, start_time: int = 0):
-        pass
+    def get_results(dbpath: str, start_time: int = 0):
+        con = sqlite3.connect(dbpath)
+        res = con.execute("SELECT channel, voltage, t FROM data WHERE t > ? ORDER BY idx DESC", (start_time, )).fetchall()
+        con.close()
+        res_data = [{'chidx': chidx, 'v': voltage, 't': t} for (chidx, voltage, t) in res]
+        return res_data
 
     @staticmethod
     def __process_response(res_dict):
