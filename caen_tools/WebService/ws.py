@@ -6,12 +6,23 @@ from fastapi.responses import FileResponse
 from caen_setup.Tickets.TicketType import TicketType
 from caen_tools.connection.client import AsyncClient
 
+from fastapi.middleware.cors import CORSMiddleware
+
 QMAXSIZE = 10
 SERVADDR = "tcp://localhost:5559"
 
 app = FastAPI()
 queue = asyncio.Queue(maxsize=QMAXSIZE)
 
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 async def fifo_worker():
     print("Start queue work")
