@@ -9,15 +9,21 @@ Conceptual implementation of the architecture for CAEN control
   * POST request to execute ticket
   * receives args related to the ticket
   * preliminary inspects the ticket (quality, necessary args and so on)
+* `/params?time={timestamp}`
+  * GET request to return monitor information after `timestamp` (UTC) value (in seconds)
 * `/list_tickets`
   * GET request to return the list of available tickets
   * Returns JSON: List[Ticket]
   * Useful for `Frontend` part
-* `/ws`
-  * WebSocket connection to receive news from the `ProxyService`
-  * Useful for `Frontend` part
 * `/`
   * root path is `Frontend` page for ticket setting
+
+#### How to attach react frontend into this project
+1. Frontend page (CAEN Manager) can be found https://github.com/caenHV/frontend_webpage
+    1. Clone this repo and go to the folder
+    1. Execute `npm run build`
+1. Copy `build` folder into `caen_tools/WebService` folder (replacing the one that exists already)
+1. It's done. Now WebService will use built frontend
 
 ### ProxyService
 Proxy Queue to forward tickets to `DeviceBackend`
@@ -65,7 +71,7 @@ to deploy webserver
 ## Final view
 Finally this project must be installed easily via pip like
 
-```pip install caen-tools[web,console-cli]```
+```pip install caen-tools[webservice]```
 
 ## Helpful links
 * [ZMQ Guide](https://zguide.zeromq.org/)
