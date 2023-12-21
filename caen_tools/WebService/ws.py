@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
@@ -7,12 +8,16 @@ from caen_setup.Tickets.TicketType import TicketType
 from caen_tools.connection.client import AsyncClient
 
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 QMAXSIZE = 10
 SERVADDR = "tcp://localhost:5559"
 
 app = FastAPI()
 queue = asyncio.Queue(maxsize=QMAXSIZE)
+
+root = os.path.dirname(os.path.abspath(__file__))
+app.mount("/static", StaticFiles(directory=os.path.join(root, "build/static")), name="static")
 
 origins = ["*"]
 
@@ -41,7 +46,7 @@ async def startup():
 
 @app.get("/")
 async def read_root():
-    return FileResponse("caen_tools/WebService/index.html")
+    return FileResponse("caen_tools/WebService/build/index.html")
 
 
 @app.get("/list_tickets")
