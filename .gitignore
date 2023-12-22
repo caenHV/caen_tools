@@ -1,7 +1,6 @@
 *__pycache__*
 venv/
 *egg-info*
-config.ini
 *.ipynb*
 *.sqlite
 *.db
