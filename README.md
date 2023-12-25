@@ -47,6 +47,11 @@ Alternative for WebService for setting tickets (from console)
 ### connection
 Python class wrappers for client and server
 
+### utils
+Set of utility functions, e.g.
+* config reader can get information from some custom `.ini` config file
+  * `config.ini` is the default config file
+
 ### [caen_setup](https://github.com/caenHV/Setup)
 Python module containing:
 * List of available tickets

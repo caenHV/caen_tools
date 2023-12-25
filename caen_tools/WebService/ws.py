@@ -3,21 +3,26 @@ import os
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
-
-from caen_setup.Tickets.TicketType import TicketType
-from caen_tools.connection.client import AsyncClient
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-QMAXSIZE = 10
-SERVADDR = "tcp://localhost:5559"
+from caen_setup.Tickets.TicketType import TicketType
+from caen_tools.connection.client import AsyncClient
+from caen_tools.utils.utils import config_processor
+
+
+settings = config_processor(None)
+
+QMAXSIZE = settings.get("webservice", "querylimit")
+SERVADDR = settings.get("webservice", "proxy_address")
 
 app = FastAPI()
 queue = asyncio.Queue(maxsize=QMAXSIZE)
 
 root = os.path.dirname(os.path.abspath(__file__))
-app.mount("/static", StaticFiles(directory=os.path.join(root, "build/static")), name="static")
+app.mount(
+    "/static", StaticFiles(directory=os.path.join(root, "build/static")), name="static"
+)
 
 origins = ["*"]
 
@@ -28,6 +33,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 async def fifo_worker():
     print("Start queue work")

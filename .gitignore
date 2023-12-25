@@ -4,3 +4,4 @@ venv/
 *.ipynb*
 *.sqlite
 *.db
+*build*

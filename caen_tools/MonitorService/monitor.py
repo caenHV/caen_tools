@@ -1,15 +1,8 @@
 import argparse
-import configparser
 import time
 
 from caen_tools.MonitorService.monclass import Monitor
-
-
-def config_processor(configfile):
-    settings = configparser.ConfigParser()
-    if configfile is not None:
-        settings.read(configfile.name)
-    return settings
+from caen_tools.utils.utils import config_processor
 
 
 def main():
@@ -25,9 +18,9 @@ def main():
     args = parser.parse_args()
     settings = config_processor(args.config)
 
-    addr = settings.get("proxy", "address", fallback="tcp://localhost:5559")
-    dbpath = settings.get("monitor", "dbpath", fallback="./monitor.db")
-    refreshtime = settings.get("monitor", "refreshtime", fallback=60)
+    addr = settings.get("monitor", "proxy_address")
+    dbpath = settings.get("monitor", "dbpath")
+    refreshtime = int(settings.get("monitor", "refreshtime"))
 
     m = Monitor(dbpath, addr)
     m.add_row()
