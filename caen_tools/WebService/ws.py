@@ -13,7 +13,7 @@ from caen_tools.utils.utils import config_processor
 
 settings = config_processor(None)
 
-QMAXSIZE = settings.get("webservice", "querylimit")
+QMAXSIZE = settings.getint("webservice", "querylimit")
 SERVADDR = settings.get("webservice", "proxy_address")
 
 app = FastAPI()
