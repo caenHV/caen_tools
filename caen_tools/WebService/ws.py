@@ -1,5 +1,8 @@
+"""WebService code"""
+
 import asyncio
 import os
+import json
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
@@ -8,7 +11,9 @@ from fastapi.staticfiles import StaticFiles
 
 from caen_setup.Tickets.TicketType import TicketType
 from caen_tools.connection.client import AsyncClient
-from caen_tools.utils.utils import config_processor
+from caen_tools.MonitorService.query import QueryMaster
+from caen_tools.utils.utils import config_processor, get_time_id
+from caen_tools.utils.responsedict import ResponseDict
 
 
 settings = config_processor(None)
@@ -18,6 +23,7 @@ SERVADDR = settings.get("webservice", "proxy_address")
 
 app = FastAPI()
 queue = asyncio.Queue(maxsize=QMAXSIZE)
+queue_response = ResponseDict(maxsize=50)
 
 root = os.path.dirname(os.path.abspath(__file__))
 app.mount(
@@ -39,9 +45,10 @@ async def fifo_worker():
     print("Start queue work")
     cli = AsyncClient(SERVADDR)
     while True:
-        job = await queue.get()
+        timeid, address, job = await queue.get()
         print(f"Get job {job}")
-        resp = await cli.query(job)
+        resp = await cli.query(job, address)
+        queue_response[timeid] = resp
         print(f"Resp: {resp}")
 
 
@@ -64,21 +71,28 @@ def read_list_tickets():
 
 
 @app.get("/params")
-def read_parameters(time):
+async def read_parameters(time):
     """[WS Backend API] Returns Monitor information"""
 
-    from caen_tools.MonitorService.monitor import Monitor
+    mon_tkt = QueryMaster.serialize(time)
+    timeid = get_time_id()
+    print(f"Query ticket: {mon_tkt}")
+    await queue.put((timeid, "monitor", mon_tkt))
+    res = await queue_response.popwaiting(timeid)
 
-    mon_db = "./monitor.db"
-    res = Monitor.get_results(mon_db, start_time=time)
-    return res
+    # from caen_tools.MonitorService.monitor import Monitor
+
+    # mon_db = "./monitor.db"
+    # res = Monitor.get_results(mon_db, start_time=time)
+    return res['body']
 
 
 @app.post("/set_ticket/{name}")
 async def post_ticket(name: str, ticket_args: Request = None):
     """[WS Backend API] Sends ticket on the setup"""
     args_dict = await ticket_args.json() if ticket_args else {}
-    tkt_json = {"name": name, "params": args_dict}
+    tkt_json = json.dumps({"name": name, "params": args_dict})
+    timeid = get_time_id()
     print(f"Query ticket: {tkt_json}")
-    await queue.put(tkt_json)
+    await queue.put((timeid, "setup", tkt_json))
     return {"status": "registered"}

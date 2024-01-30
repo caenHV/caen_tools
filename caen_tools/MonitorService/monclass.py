@@ -52,7 +52,7 @@ class MonitorDB:
         str
             string from json object
         """
-        ts = int(tkt["timestamp"])
+        ts = int(tkt["starttime"])
         selection = select(DataRows).where(DataRows.timestamp >= ts)
         res_data = list()
         with Session(self.engine) as session:
@@ -60,7 +60,7 @@ class MonitorDB:
                 # print(row)
                 datarow = {
                     "chidx": row[0].channel,
-                    "voltage": row[0].voltage,
+                    "v": row[0].voltage,
                     "t": row[0].timestamp,
                 }
                 res_data.append(datarow)

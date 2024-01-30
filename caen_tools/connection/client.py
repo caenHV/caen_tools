@@ -56,7 +56,7 @@ class AsyncClient(BaseClient):
         address : str
             address for query
         """
-        obj = jsonapi.dumps(jsobj)
+        obj = address_encoder(jsobj)  # jsonapi.dumps(jsobj)
 
         with self.socket.connect(self.connect_addr) as sock:
             # await sock.send_multipart([b"", obj])

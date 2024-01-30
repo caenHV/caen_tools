@@ -2,6 +2,12 @@ import configparser
 import pathlib
 import logging
 import sys
+import time
+
+
+def get_time_id():
+    """Returns time identifier, i.e. timestamp in ms"""
+    return int(time.time() * 1000)
 
 
 def get_default_logger(level=logging.DEBUG):

@@ -69,7 +69,7 @@ pip install -e .
 ```
 * Run `WebService` (in another bash) by `python WebService/ws.py` to execute a random number of SetVoltage tickets or 
 ```bash
-uvicorn WebService.ws:app --reload
+uvicorn caen_tools.WebService.ws:app --reload
 ```
 to deploy webserver
 
