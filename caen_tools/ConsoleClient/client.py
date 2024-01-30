@@ -3,16 +3,13 @@ import getpass
 import socket
 import json
 
-# from caen_tools.CAENLib.tickets import Tickets
 from caen_setup import TicketType
 from caen_tools.connection.client import SyncClient
 from caen_tools.ConsoleClient.listen import listen
-
-SERVADDR = "tcp://localhost:5559"
+from caen_tools.utils.utils import config_processor
 
 
 def list_available_tickets() -> list:
-    # return [t.value for t in Tickets]
     return [t.value for t in TicketType]
 
 
@@ -25,6 +22,9 @@ def jsonify_tkt(args):
 
 def main():
     user, host = getpass.getuser(), socket.gethostname()
+    settings = config_processor(None)
+    proxy_addr = settings.get("console", "proxy")
+
     parser = argparse.ArgumentParser(
         prog="Console client for tickets execution",
         description="This client can execute your ticket without WebService",
@@ -34,8 +34,8 @@ def main():
         "-a",
         "--address",
         nargs="?",
-        default=SERVADDR,
-        help=f"proxy address (default {SERVADDR})",
+        default=proxy_addr,
+        help=f"proxy address (default {proxy_addr})",
     )
     subparsers = parser.add_subparsers(
         help="Available tickets to execute:",
@@ -47,9 +47,14 @@ def main():
         name, args = ticket.type_description().name, ticket.type_description().params
         spr[name] = subparsers.add_parser(name, help=ticket.__doc__)
         for key, value in args.items():
-            # print(key)
-            min_val, max_val, desc = value['min_value'], value['max_value'], value['description']
-            spr[name].add_argument(f"{key}", help=f"{key}: {min_val} - {max_val}, Description: {desc}")
+            min_val, max_val, desc = (
+                value["min_value"],
+                value["max_value"],
+                value["description"],
+            )
+            spr[name].add_argument(
+                f"{key}", help=f"{key}: {min_val} - {max_val}, Description: {desc}"
+            )
 
     spr["Listener"] = subparsers.add_parser("Listener", help="listen proxy")
 

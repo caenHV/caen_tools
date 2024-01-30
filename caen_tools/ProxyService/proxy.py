@@ -9,7 +9,6 @@ from caen_tools.utils.utils import config_processor, get_default_logger
 def proxy(
     input_port: int,
     output_port: int,
-    monitor_port: int,
     protocol: str = "tcp",
     logger: Optional[logging.Logger] = None,
 ):
@@ -21,8 +20,6 @@ def proxy(
         input ROUTER port
     output_port : int
         output ROUTER port
-    monitor_port : int
-        monitor PUB port
     protocol : str
         connection protocol (default is "tcp")
     logger : Optional[Logger]
@@ -37,7 +34,6 @@ def proxy(
 
     in_addr = get_addr(protocol, input_port)
     out_addr = get_addr(protocol, output_port)
-    mon_addr = get_addr(protocol, monitor_port)
 
     in_socket, out_socket = zmq.ROUTER, zmq.ROUTER
 
@@ -79,17 +75,6 @@ def proxy(
         frontend.close()
         backend.close()
         context.term()
-
-    # mondev = MonitoredQueue(in_socket, out_socket, zmq.PUB)
-    # mondev.bind_in(in_addr)
-    # mondev.bind_out(out_addr)
-    # mondev.bind_mon(mon_addr)
-
-    # try:
-    #     mondev.start()
-    # except KeyboardInterrupt:
-    #     logger.info("Keyboard interrupt")
-
     return
 
 
@@ -107,9 +92,8 @@ def main():
     settings = config_processor(args.config)
     input_port = settings.get("proxy", "input_port")
     output_port = settings.get("proxy", "output_port")
-    monitor_port = settings.get("proxy", "monitor_port")
     protocol = settings.get("proxy", "protocol")
-    proxy(input_port, output_port, monitor_port, protocol)
+    proxy(input_port, output_port, protocol)
 
 
 if __name__ == "__main__":
