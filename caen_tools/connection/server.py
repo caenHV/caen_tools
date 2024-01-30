@@ -1,8 +1,11 @@
+from typing import Optional, Tuple
 import zmq
+
+from caen_tools.utils.utils import address_encoder
 
 
 class DeviceBackendServer:
-    """Implementation of the server (zmq.REP) of DeviceBackend
+    """Implementation of the server (zmq.DEALER) of DeviceBackend
     (this one receives data from outer space and interacts with the device)
 
     Parameters
@@ -12,13 +15,16 @@ class DeviceBackendServer:
         examples:
             "tcp://localhost:5560" to connect 5560 port
             "tcp://*:5560" to bind 5560 port
+    identity: str | None
+        socket identity (default is None)
     """
 
-    def __init__(self, connect_addr: str):
+    def __init__(self, connect_addr: str, identity: Optional[str] = None):
         self.context = zmq.Context()
         self.__configure_context()
 
-        self.socket = self.context.socket(zmq.REP)
+        self.socket = self.context.socket(zmq.DEALER)
+        self.socket.setsockopt(zmq.IDENTITY, address_encoder(identity))
         self.connect_addr = connect_addr
         if "*" in connect_addr:
             self.socket.bind(connect_addr)
@@ -33,16 +39,26 @@ class DeviceBackendServer:
         self.socket.close()
         self.context.term()
 
-    def recv_json(self) -> list:
-        return self.socket.recv_json()
+    def recv(self) -> Tuple[bytes, str]:
+        """Recieves data
 
-    def recv_json_str(self) -> str:
-        data = self.socket.recv()
-        return data.decode("utf8")
+        Returns
+        -------
+        Tuple[bytes, str]
+            address and message
+        """
 
-    def send_json(self, data) -> None:
-        return self.socket.send_json(data)
+        address_obj, data_obj = list(self.socket.recv_multipart())
+        return (address_obj, data_obj.decode("utf8"))
 
-    def send_json_str(self, data: str) -> None:
-        data_js = data.encode("utf8")
-        return self.socket.send(data_js)
+    def send(self, data: str, address: bytes) -> None:
+        """Sends data string on the address
+
+        Parameters
+        ----------
+        data : str
+            message string
+        address : bytes
+            address to send
+        """
+        return self.socket.send_multipart([address, data.encode("utf8")])

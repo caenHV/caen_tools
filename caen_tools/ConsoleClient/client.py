@@ -1,6 +1,7 @@
 import argparse
 import getpass
 import socket
+import json
 
 # from caen_tools.CAENLib.tickets import Tickets
 from caen_setup import TicketType
@@ -43,10 +44,12 @@ def main():
     )
     spr = dict()
     for ticket in list_available_tickets():
-        name, args = ticket.type_description().name, ticket.type_description().args
+        name, args = ticket.type_description().name, ticket.type_description().params
         spr[name] = subparsers.add_parser(name, help=ticket.__doc__)
         for key, value in args.items():
-            spr[name] = spr[name].add_argument(f"{key}", help=f"{key}: {value}")
+            # print(key)
+            min_val, max_val, desc = value['min_value'], value['max_value'], value['description']
+            spr[name].add_argument(f"{key}", help=f"{key}: {min_val} - {max_val}, Description: {desc}")
 
     spr["Listener"] = subparsers.add_parser("Listener", help="listen proxy")
 
@@ -58,7 +61,9 @@ def main():
     else:
         tkt_json = jsonify_tkt(args)
         cli = SyncClient(connect_addr=args.address)
-        resp = cli.query(tkt_json)
+        resp = cli.query(json.dumps(tkt_json), "setup")
+        # import json
+        # resp = cli.query(json.dumps({'name': 'MonitorQuery', 'timestamp': 100}), 'monitor')
 
     print("RESPONSE", resp)
     return resp

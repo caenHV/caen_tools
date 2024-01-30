@@ -1,45 +1,87 @@
-import sqlite3
 import json
-from caen_setup.Tickets.Tickets import GetParams_Ticket
+import logging
+from typing import Optional, List
 
-# from caen_setup.Tickets.TicketMaster import TicketMaster
-from caen_tools.connection.client import SyncClient
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+
+from caen_tools.MonitorService.database import DataRows, Base
+
+from caen_tools.utils.utils import get_default_logger
 
 
-class Monitor:
-    def __init__(self, dbpath: str, proxy_address: str):
-        self.cli = SyncClient(proxy_address)
-        self.ticket = GetParams_Ticket({})
-        self.tkt_json = {
-            "name": "GetParams",
-            "params": {},
-        }  # TicketMaster.serialize(self.ticket)
+class MonitorDB:
+    """Class to manipulate Monitor DataBase"""
 
-        self.down_tkt_json = {
-            "name": "Down",
-            "params": {},
-        }
-                
-        self.con = sqlite3.connect(dbpath)
-        self.con.execute(
-            "CREATE TABLE IF NOT EXISTS data (idx INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, voltage REAL, current REAL, t INTEGER);"
+    def __init__(self, dbpath: str, logger: Optional[logging.Logger] = None):
+        self.logger = (
+            logger if logger is not None else get_default_logger(logging.DEBUG)
         )
+        self.logger.debug("Init MonitorDB class")
+
+        self.engine = create_engine(f"sqlite://{dbpath}", echo=False)
+        Base.metadata.create_all(self.engine)
+        self.logger.debug("Create DB engine sqlite://%s", dbpath)
+
+    def store_data(self, data_obj: object):
+        """Stores data_obj in database
+
+        Parameters
+        ----------
+        data_obj : object
+            python object as a getparams ticket response to store in database
+        """
+        res_list = MonitorDB.__process_response(data_obj)
+
+        with Session(self.engine) as session:
+            session.add_all(res_list)
+            session.commit()
+        self.logger.debug("Updated DB. Stored new data")
+        return
+
+    def get_db_data(self, tkt: dict) -> str:
+        """Returns data from database
+
+        Parameters
+        ----------
+        tkt : dict
+            dictionary containing arguments for selection
+
+        Returns
+        -------
+        str
+            string from json object
+        """
+        ts = int(tkt["timestamp"])
+        selection = select(DataRows).where(DataRows.timestamp >= ts)
+        res_data = list()
+        with Session(self.engine) as session:
+            for row in session.execute(selection):
+                # print(row)
+                datarow = {
+                    "chidx": row[0].channel,
+                    "voltage": row[0].voltage,
+                    "t": row[0].timestamp,
+                }
+                res_data.append(datarow)
+        res_data_str = json.dumps({"status": "ok", "body": res_data})
+        return res_data_str
 
     @staticmethod
-    def get_results(dbpath: str, start_time: int = 0):
-        con = sqlite3.connect(dbpath)
-        res = con.execute(
-            "SELECT channel, voltage, t FROM data WHERE t > ? ORDER BY idx DESC",
-            (int(start_time),),
-        ).fetchall()
-        con.close()
-        res_data = [
-            {"chidx": chidx, "v": voltage, "t": t} for (chidx, voltage, t) in res
-        ]
-        return res_data
+    def __process_response(res_dict) -> List[DataRows]:
+        """Returns a list of DataRows
 
-    @staticmethod
-    def __process_response(res_dict):
+        Parameters
+        ----------
+        res_dict : dict
+            json dict response
+
+        Returns
+        -------
+        List[DataRows]
+            list of DataRows
+        """
+
         from datetime import datetime
 
         ts = int(datetime.now().timestamp())
@@ -51,22 +93,9 @@ class Monitor:
             conet = k0["board_info"][board_address]["conet"]
             link = k0["board_info"][board_address]["link"]
             chidx = f'{board_address}_{conet}_{link}_{k0["channel_num"]}'
-            res_list.append((chidx, val["VMon"], val["IMonL"], ts))
-        return res_list
-
-    def add_row(self):
-        results = self.cli.query(self.tkt_json)
-        res_dict = json.loads(results)
-        res_list = Monitor.__process_response(res_dict)
-        
-        # TODO: Move it to another place where it would fit better.
-        # Checks that all channels are okay. Otherwise submits the down ticket. 
-        ch_status_list = [int(bin(int(val['ChStatus']))[2:]) > 111 for _, val in res_dict["body"]["params"].items()]
-        if any(ch_status_list):
-            self.cli.query(self.down_tkt_json)
-            
-        with self.con:
-            self.con.executemany(
-                "INSERT INTO data(channel, voltage, current, t) VALUES(?, ?, ?, ?)", res_list
+            item = DataRows(
+                channel=chidx, timestamp=ts, current=val["IMonL"], voltage=val["VMon"]
             )
-        return
+            res_list.append(item)
+
+        return res_list
