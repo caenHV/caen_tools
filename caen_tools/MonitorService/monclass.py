@@ -22,7 +22,7 @@ class Monitor:
                 
         self.con = sqlite3.connect(dbpath)
         self.con.execute(
-            "CREATE TABLE IF NOT EXISTS data (idx INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, voltage REAL, current REAL, t INTEGER);"
+            "CREATE TABLE IF NOT EXISTS data (idx INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, voltage REAL, current REAL, t INTEGER, status INTEGER);"
         )
 
     @staticmethod
@@ -51,7 +51,8 @@ class Monitor:
             conet = k0["board_info"][board_address]["conet"]
             link = k0["board_info"][board_address]["link"]
             chidx = f'{board_address}_{conet}_{link}_{k0["channel_num"]}'
-            res_list.append((chidx, val["VMon"], val["IMonL"], ts))
+            status = int(bin(int(val['ChStatus']))[2:])
+            res_list.append((chidx, val["VMon"], val["IMonL"], ts, status))
         return res_list
 
     def add_row(self):
@@ -67,6 +68,6 @@ class Monitor:
             
         with self.con:
             self.con.executemany(
-                "INSERT INTO data(channel, voltage, current, t) VALUES(?, ?, ?, ?)", res_list
+                "INSERT INTO data(channel, voltage, current, t, status) VALUES(?, ?, ?, ?, ?)", res_list
             )
         return
