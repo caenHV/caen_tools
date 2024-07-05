@@ -52,7 +52,7 @@ class Monitor:
             link = k0["board_info"][board_address]["link"]
             chidx = f'{board_address}_{conet}_{link}_{k0["channel_num"]}'
             status = int(bin(int(val['ChStatus']))[2:])
-            res_list.append((chidx, val["VMon"], val["IMonL"], ts, status))
+            res_list.append((chidx, val["VMon"], val["IMonH"], ts, status))
         return res_list
 
     def add_row(self):
