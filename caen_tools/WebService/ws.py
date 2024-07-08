@@ -6,18 +6,25 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+
 from caen_setup.Tickets.TicketType import TicketType
 from caen_tools.connection.client import AsyncClient
-from caen_tools.utils.utils import config_processor
+from caen_tools.utils.utils import config_processor, get_timestamp
+from caen_tools.utils.receipt import (
+    Receipt,
+    ReceiptJSONEncoder,
+    ReceiptJSONDecoder,
+    ReceiptResponse,
+)
 
 
 settings = config_processor(None)
 
-QMAXSIZE = settings.getint("webservice", "querylimit")
-SERVADDR = settings.get("webservice", "proxy_address")
+SERVADDR = settings.get("ws", "proxy_address")
+RECTIME = settings.get("ws", "receive_time")
 
 app = FastAPI()
-queue = asyncio.Queue(maxsize=QMAXSIZE)
+cli = AsyncClient(SERVADDR, RECTIME)
 
 root = os.path.dirname(os.path.abspath(__file__))
 app.mount(
@@ -35,19 +42,10 @@ app.add_middleware(
 )
 
 
-async def fifo_worker():
-    print("Start queue work")
-    cli = AsyncClient(SERVADDR)
-    while True:
-        job = await queue.get()
-        print(f"Get job {job}")
-        resp = await cli.query(job)
-        print(f"Resp: {resp}")
-
-
 @app.on_event("startup")
 async def startup():
-    asyncio.create_task(fifo_worker())
+    pass
+    # asyncio.create_task(fifo_worker())
 
 
 @app.get("/")
@@ -63,22 +61,56 @@ def read_list_tickets():
     return data
 
 
-@app.get("/params")
-def read_parameters(time):
+# Device backend API routes
+
+@app.get("/device_backend/status")
+async def read_parameters(sender: str = "webcli"):
     """[WS Backend API] Returns Monitor information"""
+    import random
 
-    from caen_tools.MonitorService.monitor import Monitor
+    receipt = Receipt(
+        sender=sender,
+        executor="device_backend",
+        title="status",
+        params={"voltage": random.randint(0, 1000)},
+    )
+    print("query", receipt)
+    resp = await cli.query(receipt)
+    print("Response", resp)
+    return resp
 
-    mon_db = "./monitor.db"
-    res = Monitor.get_results(mon_db, start_time=time)
-    return res
+@app.post("/device_backend/set_voltage")
+async def set_voltage(target_voltage: float):
+    """[WS Backend API] Sets voltage on CAEN setup"""
+    receipt = Receipt(
+        sender="webcli",
+        executor="device_backend",
+        title="set_voltage",
+        params={"target_voltage": target_voltage},
+    )
+    resp = await cli.query(receipt)
+    return resp
 
+@app.post("/device_backend/down")
+async def down():
+    """[WS Backend API] Turns off voltage from CAEN setup"""
+    receipt = Receipt(
+        sender="webcli",
+        executor="device_backend",
+        title="down",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp
 
-@app.post("/set_ticket/{name}")
-async def post_ticket(name: str, ticket_args: Request = None):
-    """[WS Backend API] Sends ticket on the setup"""
-    args_dict = await ticket_args.json() if ticket_args else {}
-    tkt_json = {"name": name, "params": args_dict}
-    print(f"Query ticket: {tkt_json}")
-    await queue.put(tkt_json)
-    return {"status": "registered"}
+@app.get("/device_backend/params")
+async def params():
+    """[WS Backend API] Gets parameters of CAEN setup"""
+    receipt = Receipt(
+        sender="webcli",
+        executor="device_backend",
+        title="params",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp

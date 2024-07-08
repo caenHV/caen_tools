@@ -1,6 +1,6 @@
 [project]
 name="caen-tools"
-version="0.0.4"
+version="0.0.6"
 requires-python=">=3.11"
 dependencies=[
     "pyzmq==25.1.1",
@@ -8,7 +8,7 @@ dependencies=[
 ]
 
 [project.scripts]
-caen_device_backend = "caen_tools.DeviceBackend.back:main"
+caen_device_backend = "caen_tools.DeviceBackend.main:main"
 caen_proxy = "caen_tools.ProxyService.proxy:main"
 caen_client = "caen_tools.ConsoleClient.client:main"
 caen_monitor = "caen_tools.MonitorService.monitor:main"
