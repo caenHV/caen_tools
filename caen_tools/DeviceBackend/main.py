@@ -20,10 +20,10 @@ async def process_message(dbs: DeviceBackendServer, handler: Handler) -> None:
 
         client_address, receipt = await dbs.recv_receipt()
         print("Received", receipt, "from", client_address)
-        stime = random.randint(1, 3)
-        print("sleep", stime)
-        await asyncio.sleep(stime)
-        print("Finish sleep")
+        # stime = random.randint(1, 3)
+        # print("sleep", stime)
+        # await asyncio.sleep(stime) # remove it on production
+        # print("Finish sleep")
         out_receipt = APIFactory.execute_receipt(receipt, handler)
         await dbs.send_receipt(client_address, out_receipt)
         print("and send back")

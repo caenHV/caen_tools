@@ -1,7 +1,8 @@
 import asyncio
 import os
+from typing import List
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Body, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -23,7 +24,22 @@ settings = config_processor(None)
 SERVADDR = settings.get("ws", "proxy_address")
 RECTIME = settings.get("ws", "receive_time")
 
-app = FastAPI()
+tags_metadata = [
+    {
+        "name": "device_backend",
+        "description": "**DeviceBackend** microservice (Direct interaction with CAEN setup)",
+    },
+    {
+        "name": "monitor",
+        "description": "**Monitor** microservice (Interaction with Databases and SystemCheck)",
+    },
+]
+
+app = FastAPI(
+    title="CAEN Manager App",
+    summary="Application to run high voltage on CAEN",
+    version="0.0.1",
+)
 cli = AsyncClient(SERVADDR, RECTIME)
 
 root = os.path.dirname(os.path.abspath(__file__))
@@ -63,6 +79,7 @@ def read_list_tickets():
 
 # Device backend API routes
 
+
 @app.get("/device_backend/status")
 async def read_parameters(sender: str = "webcli"):
     """[WS Backend API] Returns Monitor information"""
@@ -79,8 +96,9 @@ async def read_parameters(sender: str = "webcli"):
     print("Response", resp)
     return resp
 
-@app.post("/device_backend/set_voltage")
-async def set_voltage(target_voltage: float):
+
+@app.post("/device_backend/set_voltage", tags=["device_backend"])
+async def set_voltage(target_voltage: float = Body(embed=True)):
     """[WS Backend API] Sets voltage on CAEN setup"""
     receipt = Receipt(
         sender="webcli",
@@ -91,7 +109,8 @@ async def set_voltage(target_voltage: float):
     resp = await cli.query(receipt)
     return resp
 
-@app.post("/device_backend/down")
+
+@app.post("/device_backend/down", tags=["device_backend"])
 async def down():
     """[WS Backend API] Turns off voltage from CAEN setup"""
     receipt = Receipt(
@@ -103,7 +122,8 @@ async def down():
     resp = await cli.query(receipt)
     return resp
 
-@app.get("/device_backend/params")
+
+@app.get("/device_backend/params", tags=["device_backend"])
 async def params():
     """[WS Backend API] Gets parameters of CAEN setup"""
     receipt = Receipt(
@@ -114,3 +134,41 @@ async def params():
     )
     resp = await cli.query(receipt)
     return resp
+
+
+# Monitor API routes
+
+
+@app.get("/monitor/params", tags=["monitor"])
+async def paramsdb(
+    paramslist: list[str] = Query(),
+    start_timestamp: int = Query(),
+    stop_timestamp: int | None = Query(default=None),
+):
+    stop_timestamp = get_timestamp() if stop_timestamp is None else stop_timestamp
+    receipt = Receipt(
+        sender="webcli",
+        executor="monitor",
+        title="params",
+        params=dict(
+            start_timestamp=start_timestamp,
+            stop_timestamp=stop_timestamp,
+            paramslist=paramslist,
+        ),
+    )
+    # mock behaviour
+    import random
+
+    outdata = list()
+    for tstamp in range(start_timestamp, stop_timestamp):
+        for ch in range(8):
+            dictrow = dict(
+                chidx=f"0000_0_0_{ch}",
+                timestamp=tstamp,
+            )
+            for p in paramslist:
+                dictrow[p] = random.gauss(ch, 2)
+            outdata.append(dictrow)
+
+    receipt.response = ReceiptResponse(statuscode=1, body={"data": outdata})
+    return receipt
