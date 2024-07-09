@@ -21,11 +21,7 @@ async def process_message(dbs: DeviceBackendServer, monitor: Monitor) -> None:
 
         client_address, receipt = await dbs.recv_receipt()
         print("Received", receipt, "from", client_address)
-        stime = random.randint(1, 3)
-        print("sleep", stime)
-        await asyncio.sleep(stime)
-        print("Finish sleep")
-
+        
         out_receipt = APIFactory.execute_receipt(receipt, monitor)
         
         await dbs.send_receipt(client_address, out_receipt)
@@ -105,7 +101,7 @@ def main():
     args = parser.parse_args()
     settings = config_processor(args.config)
     
-    address = settings.get("monitor", "proxy_address")
+    address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
     channel_map_path = settings.get("monitor", "channel_map_path")
     with open(channel_map_path) as f:
