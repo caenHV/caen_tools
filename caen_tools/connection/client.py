@@ -1,4 +1,5 @@
 from abc import ABC
+from typing import Dict
 import json
 import zmq
 import zmq.asyncio
@@ -9,6 +10,7 @@ from caen_tools.utils.receipt import (
     ReceiptJSONEncoder,
     ReceiptResponse,
 )
+from caen_tools.utils.resperrs import RResponseErrors
 
 
 class BaseClient(ABC):
@@ -35,26 +37,48 @@ class AsyncClient(BaseClient):
 
     Parameters
     ----------
-    connect_addr: str
-        connection address (e.g. "tcp://localhost:5000")
+    connect_addr: Dict[str, str]
+        map of connection addresses in format {"identity" : "address"}
+        (e.g. {"device_backend", "tcp://localhost:5000"})
     receive_time: int | None
         waiting time for server answer (in seconds)
     """
 
-    def __init__(self, connect_addr: str, receive_time: int | None = None):
+    def __init__(
+        self, connect_addresses: Dict[str, str], receive_time: int | None = None
+    ):
         context = zmq.asyncio.Context()
         self.socket = context.socket(zmq.DEALER)
-        self.connect_addr = connect_addr
+        self.connect_addresses = connect_addresses
         super().__init__(context, int(receive_time))
 
     async def query(self, receipt: Receipt) -> Receipt:
-        """Query and response"""
+        """Query and response
+
+        Parameters
+        ----------
+        receipt : Receipt
+            instruction with full information
+            about sender, executor and task
+
+        Returns
+        -------
+        Receipt
+            the same receipt with filled ReceiptResponse block
+        """
+
+        if receipt.executor not in self.connect_addresses:
+            receipt.response = RResponseErrors.NotFound(
+                f"Executor {receipt.executor} is not found"
+            )
+            return receipt
 
         receipt_str = json.dumps(receipt, cls=ReceiptJSONEncoder).encode("utf-8")
         s = self.context.socket(zmq.DEALER)
+        connect_address = self.connect_addresses[receipt.executor]
         # TODO need protection from ddos
 
-        with s.connect(self.connect_addr) as sock:
+        with s.connect(connect_address) as sock:
             await sock.send_multipart([b"", receipt_str])
 
             try:
