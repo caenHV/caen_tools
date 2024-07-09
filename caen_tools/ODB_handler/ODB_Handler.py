@@ -17,24 +17,25 @@ class ODB_Handler:
 
     def get_interlock(self):
         is_ok = True
-        with self.con:
-            try:
-                res = self.con.execute(
-                    "SELECT idx, state, t FROM interlock ORDER BY idx DESC LIMIT 1",
-                ).fetchall()
-                if len(res) < 1:
-                    is_ok = False
-                    warnings.warn(
-                        "Houston! We faced problems with the Database. No interlock records!"
-                    )
+        # with self.con:
+        #     try:
+        #         res = self.con.execute(
+        #             "SELECT idx, state, t FROM interlock ORDER BY idx DESC LIMIT 1",
+        #         ).fetchall()
+        #         if len(res) < 1:
+        #             is_ok = False
+        #             warnings.warn("Houston! We faced problems with the Database. No interlock records!")
 
-            except sqlite3.DatabaseError as e:
-                is_ok = False
-                warnings.warn(f"Houston! We faced problems with the Database: {e}")
-
-        res_data = (
-            [{"state": state, "time": t} for (_, state, t) in res] if is_ok else None
-        )
+        #     except sqlite3.DatabaseError as e:
+        #         is_ok = False
+        #         warnings.warn(f"Houston! We faced problems with the Database: {e}")
+                
+        # res_data = [
+        #     {"state": state, "time": t} for (_, state, t) in res
+        # ] if is_ok else None
+        
+        # TODO: !!!
+        res_data = [{"state": 1, "time": 1000000}]
         return res_data
 
     def write_params(self, results: list) -> bool:

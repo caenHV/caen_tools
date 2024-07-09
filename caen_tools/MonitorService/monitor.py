@@ -61,15 +61,20 @@ class APIMethods:
             receipt.params["start_time"], receipt.params["end_time"]
         )
         receipt.response = ReceiptResponse(
-            statuscode=0 if response["is_ok"] else 404,
-            body=(
-                response["params"]
-                if response["is_ok"]
-                else "Something is wrong in the DB. No rows selected."
-            ),
+            statuscode = 1 if response['is_ok'] else 0,
+            body = response['params'] if response['is_ok'] else "Something is wrong in the DB. No rows selected."
         )
         return receipt
-
+    
+    @staticmethod
+    def execute_get_interlock(receipt: Receipt, monitor: Monitor):
+        response = monitor.get_interlock()
+        receipt.response = ReceiptResponse(
+            statuscode = 1 if response['is_ok'] else 0,
+            body = response['system_health_report'] if response['is_ok'] else "Something is wrong in the DB. No rows selected."
+        )
+        return receipt
+    
     @staticmethod
     def wrongroute(receipt: Receipt) -> Receipt:
         receipt.response = ReceiptResponse(
@@ -80,9 +85,10 @@ class APIMethods:
 
 class APIFactory:
     apiroutes = {
-        "status": APIMethods.status,
-        "send_params": APIMethods.execute_send,
-        "get_params": APIMethods.execute_get,
+        "status": APIMethods.status, 
+        "send_params": APIMethods.execute_send, 
+        "get_params": APIMethods.execute_get, 
+        "get_interlock": APIMethods.execute_get_interlock, 
     }
 
     @staticmethod
