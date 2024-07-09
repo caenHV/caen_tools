@@ -1,8 +1,95 @@
 import argparse
-import time
+import asyncio
+import json
+from random import random
 
+from caen_tools.DeviceBackend.server import DeviceBackendServer
+from caen_tools.MonitorService.SystemCheck import SystemCheck
 from caen_tools.MonitorService.monclass import Monitor
+from caen_tools.utils.receipt import Receipt, ReceiptResponse
 from caen_tools.utils.utils import config_processor
+
+NUM_ASYNC_TASKS = 5
+sem = asyncio.Semaphore(NUM_ASYNC_TASKS)
+
+
+async def process_message(dbs: DeviceBackendServer, monitor: Monitor) -> None:
+    """Processes one input message"""
+
+    async with sem:
+        asyncio.ensure_future(process_message(dbs, monitor))
+
+        client_address, receipt = await dbs.recv_receipt()
+        print("Received", receipt, "from", client_address)
+        stime = random.randint(1, 3)
+        print("sleep", stime)
+        await asyncio.sleep(stime)
+        print("Finish sleep")
+
+        out_receipt = APIFactory.execute_receipt(receipt, monitor)
+        
+        await dbs.send_receipt(client_address, out_receipt)
+        print("and send back")
+
+    return
+
+
+def check_receipt(receipt: Receipt)->bool:
+    is_executor = receipt.executor.lower() == 'monitor'
+    return is_executor
+
+class APIMethods:
+    @staticmethod
+    def status(receipt: Receipt, monitor: Monitor):
+        response = monitor.is_ok()
+        receipt.response = ReceiptResponse(
+            statuscode = 1 if response['is_ok'] else 0,
+            timestamp = response['timestamp'],
+            body = {}
+        )
+        return receipt
+    
+    @staticmethod
+    def execute_send(receipt: Receipt, monitor: Monitor):
+        response = monitor.send_params(receipt.params, measurement_time = receipt.timestamp)
+        receipt.response = ReceiptResponse(
+            statuscode = 1 if response['is_ok'] else 0,
+            timestamp = response['timestamp'],
+            body = response['system_health_report']
+        )
+        return receipt
+    
+    @staticmethod
+    def execute_get(receipt: Receipt, monitor: Monitor):
+        response = monitor.get_params(receipt.params['start_time'], receipt.params['end_time'])
+        receipt.response = ReceiptResponse(
+            statuscode = 0 if response['is_ok'] else 404,
+            body = response['params'] if response['is_ok'] else "Something is wrong in the DB. No rows selected."
+        )
+        return receipt
+    
+    @staticmethod
+    def wrongroute(receipt: Receipt) -> Receipt:
+        receipt.response = ReceiptResponse(
+            statuscode=404, body="this api method is not found"
+        )
+        return receipt
+    
+class APIFactory:
+    apiroutes = {
+        "status": APIMethods.status, 
+        "send_params": APIMethods.execute_send, 
+        "get_params": APIMethods.execute_get, 
+    }
+
+    @staticmethod
+    def execute_receipt(receipt: Receipt, monitor: Monitor) -> Receipt:
+        """Matches a function to execute input receipt"""
+
+        if receipt.title in APIFactory.apiroutes and check_receipt(receipt):
+            return APIFactory.apiroutes[receipt.title](receipt, monitor)
+        return APIMethods.wrongroute(receipt)
+
 
 
 def main():
@@ -17,17 +104,29 @@ def main():
     )
     args = parser.parse_args()
     settings = config_processor(args.config)
-
-    addr = settings.get("monitor", "proxy_address")
+    
+    address = settings.get("monitor", "proxy_address")
     dbpath = settings.get("monitor", "dbpath")
-    refreshtime = int(settings.get("monitor", "refreshtime"))
+    channel_map_path = settings.get("monitor", "channel_map_path")
+    with open(channel_map_path) as f:
+        channel_map = json.load(f)
+    max_interlock_check_delta_time = int(settings.get("monitor", "max_interlock_check_delta_time"))
+    
+    system_check = SystemCheck(dbpath, max_interlock_check_delta_time)
+    monitor = Monitor(dbpath, system_check, channel_map)
+    
+    dbs = DeviceBackendServer(address)
 
-    m = Monitor(dbpath, addr)
-    m.add_row()
-    while True:
-        m.add_row()
-        time.sleep(refreshtime)
-    return
+    loop = asyncio.get_event_loop()
+    try:
+        asyncio.ensure_future(process_message(dbs, monitor))
+        loop.run_forever()
+    except KeyboardInterrupt:
+        print("keyboard interrupt")
+    finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()
+    
 
 
 if __name__ == "__main__":
