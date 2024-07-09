@@ -84,8 +84,8 @@ class AsyncClient(BaseClient):
             try:
                 response = await sock.recv_multipart()
             except zmq.error.Again:
-                receipt.response = ReceiptResponse(
-                    statuscode=-1, body={"status": "no response"}
+                receipt.response = RResponseErrors.GatewayTimeout(
+                    f"No response from {receipt.executor} service"
                 )
                 return receipt
 

@@ -92,14 +92,6 @@ async def read_root():
     return FileResponse("caen_tools/WebService/build/index.html")
 
 
-@app.get("/list_tickets")
-def read_list_tickets():
-    """[WS Backend API] Returns a list of available tickets"""
-
-    data = [(t.value.type_description().__dict__) for t in TicketType]
-    return data
-
-
 # API part
 # --------
 
@@ -147,7 +139,7 @@ async def down():
 
 
 @app.get(f"/{Services.DEVBACK.title}/params", tags=[Services.DEVBACK.title])
-async def params():
+async def deviceparams():
     """[WS Backend API] Gets parameters of CAEN setup"""
     receipt = Receipt(
         sender="webcli",
@@ -162,9 +154,21 @@ async def params():
 # Monitor API routes
 
 
+@app.get(f"/{Services.MONITOR.title}/status", tags=[Services.MONITOR.title])
+async def monstatus() -> Receipt:
+    """Returns a status of the Monitor service"""
+    receipt_in = Receipt(
+        sender="webcli",
+        executor=Services.MONITOR.title,
+        title="status",
+        params={},
+    )
+    receipt_out = await cli.query(receipt_in)
+    return receipt_out
+
+
 @app.get(f"/{Services.MONITOR.title}/getparams", tags=[Services.MONITOR.title])
 async def paramsdb(
-    paramslist: list[str] = Query(),
     start_timestamp: int = Query(),
     stop_timestamp: int | None = Query(default=None),
 ):
@@ -179,15 +183,19 @@ async def paramsdb(
         ),
     )
     resp = await cli.query(receipt)
-    return receipt
+    return resp
 
 
 @app.post(f"/{Services.MONITOR.title}/setparams", tags=[Services.MONITOR.title])
-async def setparamsdb():
-    # receipt = Receipt(
-    #     sender="webcli",
-    #     executor=Services.MONITOR.title,
-    #     title="set_params",
-    #     params=paramsdict,
-    # )
-    return
+async def setparamsdb(
+    params: dict[str, dict[str, float]] = Body(embed=True)
+) -> Receipt:
+    """Writes input parameters into database"""
+    receipt = Receipt(
+        sender="webcli",
+        executor=Services.MONITOR.title,
+        title="send_params",
+        params={"params": params},
+    )
+    resp = await cli.query(receipt)
+    return resp
