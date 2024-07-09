@@ -16,5 +16,7 @@ caen_monitor = "caen_tools.MonitorService.monitor:main"
 [project.optional-dependencies]
 webservice=[
     "fastapi==0.104.1",
+    "typing_extensions==4.8.0",
+    "fastapi-utils==0.7.0",
     "uvicorn==0.23.2",
 ]

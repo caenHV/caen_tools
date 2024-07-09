@@ -9,6 +9,8 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from fastapi_utils.tasks import repeat_every
+
 
 from caen_setup.Tickets.TicketType import TicketType
 from caen_tools.connection.client import AsyncClient
@@ -82,9 +84,19 @@ app.add_middleware(
 
 
 @app.on_event("startup")
-async def startup():
-    pass
-    # asyncio.create_task(fifo_worker())
+@repeat_every(seconds=10)
+async def system_control() -> None:
+    # TODO check it
+    # print("go")
+    params = await deviceparams()  # get device parameters
+    print(params["response"]["timestamp"])
+    dbresp = await setparamsdb(params["response"]["body"]["params"])
+
+    if not (dbresp.response["body"]["params_ok"]):
+        print("DOWN")
+        await down()
+
+    return
 
 
 @app.get("/")
