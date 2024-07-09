@@ -66,6 +66,15 @@ class Monitor:
         }
         return response
     
+    def get_interlock(self)->dict:
+        res = self.__system_check.check_interlock()
+        response = {
+            "timestamp" : int(datetime.now().timestamp()),
+            "is_ok" : res is not None,
+            "system_health_report" : res
+        }
+        return response
+    
     def is_ok(self)->dict:
         response = {
             "timestamp" : int(datetime.now().timestamp()),

@@ -63,8 +63,17 @@ class APIMethods:
     def execute_get(receipt: Receipt, monitor: Monitor):
         response = monitor.get_params(receipt.params['start_time'], receipt.params['end_time'])
         receipt.response = ReceiptResponse(
-            statuscode = 0 if response['is_ok'] else 404,
+            statuscode = 1 if response['is_ok'] else 0,
             body = response['params'] if response['is_ok'] else "Something is wrong in the DB. No rows selected."
+        )
+        return receipt
+    
+    @staticmethod
+    def execute_get_interlock(receipt: Receipt, monitor: Monitor):
+        response = monitor.get_interlock()
+        receipt.response = ReceiptResponse(
+            statuscode = 1 if response['is_ok'] else 0,
+            body = response['system_health_report'] if response['is_ok'] else "Something is wrong in the DB. No rows selected."
         )
         return receipt
     
@@ -80,6 +89,7 @@ class APIFactory:
         "status": APIMethods.status, 
         "send_params": APIMethods.execute_send, 
         "get_params": APIMethods.execute_get, 
+        "get_interlock": APIMethods.execute_get_interlock, 
     }
 
     @staticmethod
@@ -105,7 +115,7 @@ def main():
     args = parser.parse_args()
     settings = config_processor(args.config)
     
-    address = settings.get("monitor", "proxy_address")
+    address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
     channel_map_path = settings.get("monitor", "channel_map_path")
     with open(channel_map_path) as f:

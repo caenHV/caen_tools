@@ -29,7 +29,7 @@ The microservice for reading, writing and checking CAEN channel parameters.
 
 > | name |  type   | data type  | description |
 > |------|-----|---------|-----------------|
-> | channel_id |  required | str   | Channel id in the following format: "{board}_{conet}_{link}_{channel num}" |
+> | channel_id |  required | str   | Channel id in the following format: "board_conet_link_channel" |
 > | channel_parameters |  required | dict   | Channel parameters from CAEN board |
 
 ##### Responses
@@ -51,6 +51,24 @@ The microservice for reading, writing and checking CAEN channel parameters.
 > |------|-----|---------|-----------------|
 > | start_time |  required | int   | Start timestamp of requested info (in seconds from the Epoch) |
 > | end_time |  required | int   | End timestamp of requested info (in seconds from the Epoch)  |
+
+##### Responses
+
+> | status code | response/body | response/body example |
+> |------|-----|-----|
+> | `1` | `application/json` | `{'timestamp': 1720361379,'body': {'params_ok' : True, 'interlock' : False,  'interlock check timestamp' : 1720361369, 'params check timestamp' : 1720361379}}` |
+> | `0` | `text/plain;charset=UTF-8` | `"Something is wrong in the DB. No rows selected."` |
+
+</details>
+
+<details>
+ <summary><code>GET</code> <code><b>/get_interlock</b></code>
+ <code>(Get cahnnel params from the DB )</code></summary>
+
+##### Parameters
+
+> | name |  type   | data type  | description |
+> |------|-----|---------|-----------------|
 
 ##### Responses
 
