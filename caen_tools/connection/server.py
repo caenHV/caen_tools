@@ -1,3 +1,5 @@
+"""Base zmq Server implementation"""
+
 from typing import Tuple
 import json
 

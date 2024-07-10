@@ -1,15 +1,12 @@
+"""Base zmq client implementation"""
+
 from abc import ABC
 from typing import Dict
 import json
 import zmq
 import zmq.asyncio
 from zmq.utils import jsonapi
-from caen_tools.utils.receipt import (
-    Receipt,
-    ReceiptJSONDecoder,
-    ReceiptJSONEncoder,
-    ReceiptResponse,
-)
+from caen_tools.utils.receipt import Receipt, ReceiptJSONEncoder
 from caen_tools.utils.resperrs import RResponseErrors
 
 
@@ -61,6 +58,9 @@ class AsyncClient(BaseClient):
             instruction with full information
             about sender, executor and task
 
+            the field "executor" in the Receipt
+            must correspond to the key from the connect_addresses
+
         Returns
         -------
         Receipt
@@ -76,7 +76,6 @@ class AsyncClient(BaseClient):
         receipt_str = json.dumps(receipt, cls=ReceiptJSONEncoder).encode("utf-8")
         s = self.context.socket(zmq.DEALER)
         connect_address = self.connect_addresses[receipt.executor]
-        # TODO need protection from ddos
 
         with s.connect(connect_address) as sock:
             await sock.send_multipart([b"", receipt_str])

@@ -1,8 +1,8 @@
-import asyncio
+"""WebServer implementation"""
+
 import os
 from enum import Enum
 from collections import namedtuple
-from typing import List
 
 from fastapi import FastAPI, Body, Query
 from fastapi.responses import FileResponse
@@ -11,14 +11,9 @@ from fastapi.staticfiles import StaticFiles
 
 from fastapi_utils.tasks import repeat_every
 
-
-from caen_setup.Tickets.TicketType import TicketType
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.utils import config_processor, get_timestamp
-from caen_tools.utils.receipt import (
-    Receipt,
-    ReceiptResponse,
-)
+from caen_tools.utils.receipt import Receipt
 
 # Initialization part
 # -------------------
@@ -33,10 +28,12 @@ class Services(Enum):
 
     @property
     def title(self):
+        """Returns a title of the microservice"""
         return self.value.title
 
     @property
     def address(self):
+        """Returns an adress of the microservice"""
         return self.value.address
 
     DEVBACK = Service("device_backend", settings.get("ws", "device_backend"))
@@ -84,15 +81,23 @@ app.add_middleware(
 
 
 @app.on_event("startup")
-@repeat_every(seconds=10)
+@repeat_every(seconds=1)
 async def system_control() -> None:
-    # TODO check it
-    # print("go")
+    """The scheduled script for
+    continious system control.
+
+    1. Gets parameters of the system
+    2. Sends them to monitor
+    3. Get system check response
+    4. Down voltage in case of failed check
+    """
+
+    # TODO check this script
     params = await deviceparams()  # get device parameters
     print(params["response"]["timestamp"])
     dbresp = await setparamsdb(params["response"]["body"]["params"])
 
-    if not (dbresp.response["body"]["params_ok"]):
+    if not dbresp.response["body"]["params_ok"]:
         print("DOWN")
         await down()
 
@@ -101,6 +106,7 @@ async def system_control() -> None:
 
 @app.get("/")
 async def read_root():
+    """Redirect on frontend page"""
     return FileResponse("caen_tools/WebService/build/index.html")
 
 
@@ -168,7 +174,7 @@ async def deviceparams():
 
 @app.get(f"/{Services.MONITOR.title}/status", tags=[Services.MONITOR.title])
 async def monstatus() -> Receipt:
-    """Returns a status of the Monitor service"""
+    """[WS Backend API] Returns a status of the Monitor service"""
     receipt_in = Receipt(
         sender="webcli",
         executor=Services.MONITOR.title,
@@ -184,6 +190,7 @@ async def paramsdb(
     start_timestamp: int = Query(),
     stop_timestamp: int | None = Query(default=None),
 ):
+    """[WS Backend API] Returns parameters from the Monitor microservice"""
     stop_timestamp = get_timestamp() if stop_timestamp is None else stop_timestamp
     receipt = Receipt(
         sender="webcli",
@@ -202,7 +209,7 @@ async def paramsdb(
 async def setparamsdb(
     params: dict[str, dict[str, float]] = Body(embed=True)
 ) -> Receipt:
-    """Writes input parameters into database"""
+    """[WS Backend API] Sends input parameters into Monitor"""
     receipt = Receipt(
         sender="webcli",
         executor=Services.MONITOR.title,
