@@ -20,8 +20,8 @@ class SystemCheck:
             
     def check_interlock(self)->dict:
         interlock = self.__odb.get_interlock()
-        self.__interlock = interlock[-1]['state'] if interlock is not None else True
-        self.__last_interlock_check = interlock[-1]['time'] if interlock is not None else self.__last_interlock_check
+        self.__interlock = (interlock['state'] == 1)
+        self.__last_interlock_check = interlock['time']
             
         response = {
             "params_ok" : self.__are_params_ok,

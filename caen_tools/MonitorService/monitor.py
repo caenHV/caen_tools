@@ -113,13 +113,14 @@ def main():
     
     address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
+    param_file_path = settings.get("monitor", "param_file_path")
     channel_map_path = settings.get("monitor", "channel_map_path")
     with open(channel_map_path) as f:
         channel_map = json.load(f)
     max_interlock_check_delta_time = int(settings.get("monitor", "max_interlock_check_delta_time"))
     
     system_check = SystemCheck(dbpath, max_interlock_check_delta_time)
-    monitor = Monitor(dbpath, system_check, channel_map)
+    monitor = Monitor(dbpath, system_check, channel_map, param_file_path)
     
     dbs = DeviceBackendServer(address)
 
