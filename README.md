@@ -60,15 +60,24 @@ Tested on `python==3.11.2` with extra modules described in `requirements.txt`
 
 ## Running
 
+### Developer mode 
+
 * Build module via pip
 ```bash
 pip install -e .
 ```
 * Run `WebService` (in another bash) through 
 ```bash
-uvicorn caen_tools.WebService.ws:app --reload
+uvicorn caen_tools.WebService.ws:app
 ```
 to deploy webserver
+
+### Production mode
+* Build the package from the directory containing `pyproject.toml`
+```bash
+python3 -m pip install --upgrade build
+python3 -m build
+```
 
 ## Final view
 Finally this project must be installed easily via pip like
