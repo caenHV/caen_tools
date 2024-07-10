@@ -53,7 +53,7 @@ The microservice for execution of the tickets on the CAEN device.
 
 > | status code | response/body | response/body example |
 > |------|-----|-----|
-> | `1` | `application/json` | `{'voltage': 1.01}` |
+> | `1` | `application/json` | `{}` |
 > | `0` | `text/plain;charset=UTF-8` | `"Voltage is not set on the device"` |
 
 </details>

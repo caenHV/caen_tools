@@ -1,3 +1,5 @@
+"""Monitor microservice"""
+
 import argparse
 import asyncio
 import json
@@ -30,13 +32,18 @@ async def process_message(dbs: RouterServer, monitor: Monitor) -> None:
 
 
 def check_receipt(receipt: Receipt) -> bool:
+    """Check input receipt"""
     is_executor = receipt.executor.lower() == "monitor"
     return is_executor
 
 
 class APIMethods:
+    """Contains implementations of the API methods
+    of the microservice"""
+
     @staticmethod
     def status(receipt: Receipt, monitor: Monitor):
+        """Returns status of the microservice"""
         response = monitor.is_ok()
         receipt.response = ReceiptResponse(
             statuscode=1 if response["is_ok"] else 0, body={}
@@ -45,6 +52,8 @@ class APIMethods:
 
     @staticmethod
     def execute_send(receipt: Receipt, monitor: Monitor):
+        """Sends device parameters in Monitor.
+        Monitor writes them in the DB and returns health report"""
         response = monitor.send_params(
             receipt.params, measurement_time=receipt.timestamp
         )
@@ -56,26 +65,37 @@ class APIMethods:
 
     @staticmethod
     def execute_get(receipt: Receipt, monitor: Monitor):
+        """Gets device parameters from Monitor"""
         response = monitor.get_params(
             receipt.params["start_time"], receipt.params["end_time"]
         )
         receipt.response = ReceiptResponse(
-            statuscode = 1 if response['is_ok'] else 0,
-            body = response['params'] if response['is_ok'] else "Something is wrong in the DB. No rows selected."
+            statuscode=1 if response["is_ok"] else 0,
+            body=(
+                response["params"]
+                if response["is_ok"]
+                else "Something is wrong in the DB. No rows selected."
+            ),
         )
         return receipt
-    
+
     @staticmethod
     def execute_get_interlock(receipt: Receipt, monitor: Monitor):
+        """Returns interlock status"""
         response = monitor.get_interlock()
         receipt.response = ReceiptResponse(
-            statuscode = 1 if response['is_ok'] else 0,
-            body = response['system_health_report'] if response['is_ok'] else "Something is wrong in the DB. No rows selected."
+            statuscode=1 if response["is_ok"] else 0,
+            body=(
+                response["system_health_report"]
+                if response["is_ok"]
+                else "Something is wrong in the DB. No rows selected."
+            ),
         )
         return receipt
-    
+
     @staticmethod
     def wrongroute(receipt: Receipt) -> Receipt:
+        """Default answer for the wrong title field in the receipt"""
         receipt.response = ReceiptResponse(
             statuscode=404, body="this api method is not found"
         )
@@ -84,10 +104,10 @@ class APIMethods:
 
 class APIFactory:
     apiroutes = {
-        "status": APIMethods.status, 
-        "send_params": APIMethods.execute_send, 
-        "get_params": APIMethods.execute_get, 
-        "get_interlock": APIMethods.execute_get_interlock, 
+        "status": APIMethods.status,
+        "send_params": APIMethods.execute_send,
+        "get_params": APIMethods.execute_get,
+        "get_interlock": APIMethods.execute_get_interlock,
     }
 
     @staticmethod

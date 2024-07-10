@@ -1,22 +1,23 @@
-# Microservices concept
+# CAEN Microservices
 
-Conceptual implementation of the architecture for CAEN control
+Implementation of the architecture for CAEN control
 
 ## List of microservices
 
 ### WebService
-* `/set_ticket/{name}`
-  * POST request to execute ticket
-  * receives args related to the ticket
-  * preliminary inspects the ticket (quality, necessary args and so on)
-* `/params?time={timestamp}`
-  * GET request to return monitor information after `timestamp` (UTC) value (in seconds)
-* `/list_tickets`
-  * GET request to return the list of available tickets
-  * Returns JSON: List[Ticket]
-  * Useful for `Frontend` part
+* `/device_backend/status`
+  * GET request to check status of the deviceBackend
+* `/device_backend/params`
+  * GET request to recieve parmeters of the device
+* `/device_backend/set_voltage`
+  * POST request to set voltage on the device
+* `/device_backend/down`
+  * POST request to turn off voltage on the device
 * `/`
   * root path is `Frontend` page for ticket setting
+* `/docs`
+  * a full list of the available API methods can be found 
+  at this way
 
 #### How to attach react frontend into this project
 1. Frontend page (CAEN Manager) can be found https://github.com/caenHV/frontend_webpage
@@ -25,24 +26,19 @@ Conceptual implementation of the architecture for CAEN control
 1. Copy `build` folder into `caen_tools/WebService` folder (replacing the one that exists already)
 1. It's done. Now WebService will use built frontend
 
-### ProxyService
-Proxy Queue to forward tickets to `DeviceBackend`
-* Manipulates with JSON ticket representations
-* `WebService` / `MonitorService` / `ConsoleClient` → `ProxyService` → `DeviceBackend`
-* Has `PUB` socket output for every proxying message
-
 ### DeviceBackend
-* Recieves JSON tickets and executes them
-* Uses `caen_setup` module
+* Recieves **Receipts** from `WebService` and executes them:
+  * *Set_Voltage* sets voltage on the Device
+  * *Down* turns off voltage on the Device
+  * *Get_Params* gets parameters from the Device
+* Uses `caen_setup` module for the Device interaction
 
 ### MonitorService
-Sends special `MonitorTicket` to the `DeviceBackend`, recieves parameters of the device and manipulates them.
+* Recieves **Receipts** from `WebService` and executes them:
+  * *Send_Params* sends parameters into database (and check them on system check)
+  * *Get_Params* gets parameters from database
 
-### ConsoleClient
-Alternative for WebService for setting tickets (from console)
-
-> *Note*:
-> in future, seems, we can add ssh tunneling (for zmq) and enable remote managing 
+__________
 
 ### connection
 Python class wrappers for client and server
@@ -51,6 +47,7 @@ Python class wrappers for client and server
 Set of utility functions, e.g.
 * config reader can get information from some custom `.ini` config file
   * `config.ini` is the default config file
+* Receipt and ReceiptResponse structure
 
 ### [caen_setup](https://github.com/caenHV/Setup)
 Python module containing:
@@ -67,9 +64,9 @@ Tested on `python==3.11.2` with extra modules described in `requirements.txt`
 ```bash
 pip install -e .
 ```
-* Run `WebService` (in another bash) by `python WebService/ws.py` to execute a random number of SetVoltage tickets or 
+* Run `WebService` (in another bash) through 
 ```bash
-uvicorn WebService.ws:app --reload
+uvicorn caen_tools.WebService.ws:app --reload
 ```
 to deploy webserver
 

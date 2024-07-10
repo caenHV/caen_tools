@@ -1,3 +1,6 @@
+"""Defines the Receipt and ReceiptResponse
+(microservices communicate using these objects)"""
+
 from dataclasses import dataclass, field
 from typing import Union
 

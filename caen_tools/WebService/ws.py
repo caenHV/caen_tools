@@ -92,7 +92,6 @@ async def system_control() -> None:
     4. Down voltage in case of failed check
     """
 
-    # TODO check this script
     params = await deviceparams()  # get device parameters
     print(params["response"]["timestamp"])
     dbresp = await setparamsdb(params["response"]["body"]["params"])
