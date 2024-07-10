@@ -1,3 +1,5 @@
+"""Defines API methods for DeviceBackend microservice"""
+
 import json
 from caen_setup import Handler
 from caen_setup.Tickets.Tickets import (
@@ -11,9 +13,25 @@ from caen_tools.utils.receipt import Receipt, ReceiptResponse
 
 
 class APIMethods:
+    """Contains implementations of the API methods
+    of the microservice"""
 
     @staticmethod
     def ticketexec(ticket: Ticket, h: Handler) -> ReceiptResponse:
+        """Base ticket execution process
+
+        Parameters
+        ----------
+        ticket : Ticket
+            a ticket for execution
+        h : Handler
+            handler objects for controlling device
+
+        Returns
+        -------
+        ReceiptResponse
+            response on the executed ticket
+        """
         ticket_response = json.loads(ticket.execute(h))
         if ticket_response["status"] is False:
             response = ReceiptResponse(
@@ -31,12 +49,25 @@ class APIMethods:
 
     @staticmethod
     def set_voltage(receipt: Receipt, h: Handler) -> Receipt:
+        """Sets a voltage on the device
+
+        Notes
+        -----
+        receipt.params must correspond SetVoltage_Ticket.type_description
+        """
         ticket = SetVoltage_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
         return receipt
 
     @staticmethod
     def params(receipt: Receipt, h: Handler) -> Receipt:
+        """Returns parameters of the device
+
+        Notes
+        -----
+        receipt.params must correspond GetParams_Ticket.type_description
+        """
+
         ticket = GetParams_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
         rawdict = receipt.response.body["params"]
@@ -54,12 +85,14 @@ class APIMethods:
 
     @staticmethod
     def down(receipt: Receipt, h: Handler) -> Receipt:
+        """Turns off voltage on the device"""
         ticket = Down_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
         return receipt
 
     @staticmethod
     def wrongroute(receipt: Receipt) -> Receipt:
+        """Default answer for the wrong title field in the receipt"""
         receipt.response = ReceiptResponse(
             statuscode=404, body="this api method is not found"
         )
@@ -67,6 +100,7 @@ class APIMethods:
 
 
 class APIFactory:
+    """Executes input receipt"""
 
     apiroutes = {
         "status": APIMethods.status,
@@ -77,7 +111,20 @@ class APIFactory:
 
     @staticmethod
     def execute_receipt(receipt: Receipt, h: Handler) -> Receipt:
-        """Matches a function to execute input receipt"""
+        """Matches a function to execute input receipt
+
+        Parameters
+        ----------
+        receipt : Receipt
+            input receipt for execution
+        h : Handler
+            handler of the device
+
+        Returns
+        -------
+        Receipt
+            input receipt with extra ReceiptResponse block
+        """
 
         if receipt.title in APIFactory.apiroutes:
             return APIFactory.apiroutes[receipt.title](receipt, h)
