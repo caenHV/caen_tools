@@ -1,6 +1,6 @@
 [project]
 name="caen-tools"
-version="0.0.6"
+version="1.0"
 requires-python=">=3.11"
 dependencies=[
     "pyzmq==25.1.1",
