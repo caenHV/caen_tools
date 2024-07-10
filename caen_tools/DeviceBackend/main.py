@@ -1,9 +1,9 @@
+"""Implementation of the DeviceBackend microservice"""
+
 import asyncio
 import argparse
 from caen_setup import Handler
 
-# from caen_setup.Tickets.TicketMaster import TicketMaster
-# from caen_tools.DeviceBackend.server import DeviceBackendServer
 from caen_tools.connection.server import RouterServer
 from caen_tools.DeviceBackend.apifactory import APIFactory
 from caen_tools.utils.utils import config_processor

@@ -4,6 +4,8 @@ import os
 from enum import Enum
 from collections import namedtuple
 
+import uvicorn
+
 from fastapi import FastAPI, Body, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,7 +56,7 @@ tags_metadata = [
 app = FastAPI(
     title="CAEN Manager App",
     summary="Application to run high voltage on CAEN",
-    version="0.0.1",
+    version="0.0.2",
 )
 cli = AsyncClient(
     {s.title: s.address for s in Services},
@@ -63,7 +65,9 @@ cli = AsyncClient(
 
 root = os.path.dirname(os.path.abspath(__file__))
 app.mount(
-    "/static", StaticFiles(directory=os.path.join(root, "build/static")), name="static"
+    "/static",
+    StaticFiles(directory=os.path.join(root, "build", "static")),
+    name="static",
 )
 
 origins = ["*"]
@@ -106,7 +110,7 @@ async def system_control() -> None:
 @app.get("/")
 async def read_root():
     """Redirect on frontend page"""
-    return FileResponse("caen_tools/WebService/build/index.html")
+    return FileResponse(os.path.join(root, "build", "index.html"))
 
 
 # API part
@@ -217,3 +221,15 @@ async def setparamsdb(
     )
     resp = await cli.query(receipt)
     return resp
+
+
+def main():
+    """Runs server"""
+    # 192.168.173.217
+    uvicorn.run(
+        "caen_tools.WebService.ws:app", port=8000, log_level="info", host="0.0.0.0"
+    )
+
+
+if __name__ == "__main__":
+    main()
