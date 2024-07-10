@@ -15,14 +15,16 @@ class Monitor:
     @staticmethod
     def __process_response(res_dict, measurement_time):
         ts = measurement_time
-        res = res_dict["body"]["params"]
+        
+        res = res_dict["params"]
+        
         res_list = []
-        for key, val in res.items():
-            k0 = json.loads(key.replace("\\", ""))
-            board_address = list(k0["board_info"].keys())[0]
-            conet = k0["board_info"][board_address]["conet"]
-            link = k0["board_info"][board_address]["link"]
-            chidx = f'{board_address}_{conet}_{link}_{k0["channel_num"]}'
+        for chidx, val in res.items():
+            # k0 = json.loads(key.replace("\\", ""))
+            # board_address = list(k0["board_info"].keys())[0]
+            # conet = k0["board_info"][board_address]["conet"]
+            # link = k0["board_info"][board_address]["link"]
+            # chidx = f'{board_address}_{conet}_{link}_{k0["channel_num"]}'
             status = int(bin(int(val['ChStatus']))[2:])
             res_list.append((chidx, val["VMon"], val["IMonH"], ts, status))
         return res_list
@@ -48,7 +50,7 @@ class Monitor:
         cooked_res_list = [(str(self.__channel_map[chidx]), VMon, IMonH, ts, status) 
                            for (chidx, VMon, IMonH, ts, status) in res_list 
                            if chidx in self.__channel_map.keys()]
-        health_report = self.__system_check.check_params(params["body"]["params"])
+        health_report = self.__system_check.check_params(params["params"])
         is_ok = self.__odb.write_params(cooked_res_list, self.__param_file_path)
         response = {
             "timestamp" : int(datetime.now().timestamp()),

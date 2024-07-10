@@ -100,13 +100,13 @@ class ODB_Handler:
             is_ok = False
             
         return is_ok
-    
-    def get_params(self, start: int, end: int)->dict | None:
-        is_ok = True      
+
+    def get_params(self, start: int, end: int) -> dict | None:
+        is_ok = True
         with self.con as con:
             try:
                 res = con.execute(
-                    "SELECT channel, voltage, current, t FROM data WHERE (t > ? AND t < ?) ORDER BY idx DESC",
+                    "SELECT channel, voltage, current, t FROM data WHERE (t > ? AND t <= ?) ORDER BY idx DESC",
                     (start, end),
                 ).fetchall()
             except sqlite3.DatabaseError as e:

@@ -21,7 +21,24 @@ class ReceiptResponse:
 
 @dataclass
 class Receipt:
-    """Class for keeping receipts"""
+    """A message structure for conversation between microservices
+
+    Parameters
+    ----------
+    sender : str
+        author of the receipt
+    executor : str
+        microservice for the execution
+    title : str
+        title of the task
+    params : dict
+        arguments of the task
+    timestamp : int
+        time creation of the receipt
+        (defined automatically)
+    response : ReceiptResponse
+        response on this receipt
+    """
 
     sender: str
     executor: str

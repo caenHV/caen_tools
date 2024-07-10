@@ -1,6 +1,11 @@
 import json
 from caen_setup import Handler
-from caen_setup.Tickets.Tickets import Ticket, SetVoltage_Ticket, Down_Ticket, GetParams_Ticket
+from caen_setup.Tickets.Tickets import (
+    Ticket,
+    SetVoltage_Ticket,
+    Down_Ticket,
+    GetParams_Ticket,
+)
 
 from caen_tools.utils.receipt import Receipt, ReceiptResponse
 
@@ -10,19 +15,17 @@ class APIMethods:
     @staticmethod
     def ticketexec(ticket: Ticket, h: Handler) -> ReceiptResponse:
         ticket_response = json.loads(ticket.execute(h))
-        if ticket_response['status'] is False:
+        if ticket_response["status"] is False:
             response = ReceiptResponse(
-                statuscode=0, body=ticket_response['body']['error']
+                statuscode=0, body=ticket_response["body"]["error"]
             )
             return response
-        response = ReceiptResponse(
-            statuscode=1, body=ticket_response["body"]
-        )
+        response = ReceiptResponse(statuscode=1, body=ticket_response["body"])
         return response
-
 
     @staticmethod
     def status(receipt: Receipt, h: Handler) -> Receipt:
+        """Returns statuscode of the service"""
         receipt.response = ReceiptResponse(statuscode=1, body={})
         return receipt
 
@@ -36,17 +39,17 @@ class APIMethods:
     def params(receipt: Receipt, h: Handler) -> Receipt:
         ticket = GetParams_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
-        rawdict = receipt.response.body['params']
+        rawdict = receipt.response.body["params"]
         outdict = dict()
         for key in rawdict:
-            keydict = json.loads(key.replace('\\', ''))
-            board = list(keydict['board_info'].keys())[0]
-            conet = keydict['board_info'][board]['conet']
-            link = keydict['board_info'][board]['link']
-            chnum = keydict['channel_num']
+            keydict = json.loads(key.replace("\\", ""))
+            board = list(keydict["board_info"].keys())[0]
+            conet = keydict["board_info"][board]["conet"]
+            link = keydict["board_info"][board]["link"]
+            chnum = keydict["channel_num"]
             channel_id = f"{board}_{conet}_{link}_{chnum}"
             outdict[channel_id] = rawdict[key]
-        receipt.response.body['params'] = outdict
+        receipt.response.body["params"] = outdict
         return receipt
 
     @staticmethod
@@ -66,8 +69,8 @@ class APIMethods:
 class APIFactory:
 
     apiroutes = {
-        "status": APIMethods.status, 
-        "set_voltage": APIMethods.set_voltage, 
+        "status": APIMethods.status,
+        "set_voltage": APIMethods.set_voltage,
         "params": APIMethods.params,
         "down": APIMethods.down,
     }

@@ -5,8 +5,8 @@ import zmq.asyncio
 from caen_tools.utils.receipt import Receipt, ReceiptJSONDecoder, ReceiptJSONEncoder
 
 
-class DeviceBackendServer:
-    """Implementation of the async server (zmq.ROUTER) of DeviceBackend
+class RouterServer:
+    """Implementation of the async server (zmq.ROUTER) (for DeviceBackend firstly)
     (this one receives data from outer space and interacts with the device)
 
     Parameters

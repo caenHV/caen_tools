@@ -1,5 +1,7 @@
 import asyncio
 import os
+from enum import Enum
+from collections import namedtuple
 from typing import List
 
 from fastapi import FastAPI, Body, Query
@@ -13,24 +15,39 @@ from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.utils import config_processor, get_timestamp
 from caen_tools.utils.receipt import (
     Receipt,
-    ReceiptJSONEncoder,
-    ReceiptJSONDecoder,
     ReceiptResponse,
 )
 
+# Initialization part
+# -------------------
 
 settings = config_processor(None)
 
-SERVADDR = settings.get("ws", "proxy_address")
-RECTIME = settings.get("ws", "receive_time")
+Service = namedtuple("Service", ["title", "address"])
+
+
+class Services(Enum):
+    """A list of microservices"""
+
+    @property
+    def title(self):
+        return self.value.title
+
+    @property
+    def address(self):
+        return self.value.address
+
+    DEVBACK = Service("device_backend", settings.get("ws", "device_backend"))
+    MONITOR = Service("monitor", settings.get("ws", "monitor"))
+
 
 tags_metadata = [
     {
-        "name": "device_backend",
+        "name": Services.DEVBACK.title,
         "description": "**DeviceBackend** microservice (Direct interaction with CAEN setup)",
     },
     {
-        "name": "monitor",
+        "name": Services.MONITOR.title,
         "description": "**Monitor** microservice (Interaction with Databases and SystemCheck)",
     },
 ]
@@ -40,7 +57,10 @@ app = FastAPI(
     summary="Application to run high voltage on CAEN",
     version="0.0.1",
 )
-cli = AsyncClient(SERVADDR, RECTIME)
+cli = AsyncClient(
+    {s.title: s.address for s in Services},
+    settings.get("ws", "receive_time"),
+)
 
 root = os.path.dirname(os.path.abspath(__file__))
 app.mount(
@@ -57,6 +77,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Schedulers part
+# ---------------
+
 
 @app.on_event("startup")
 async def startup():
@@ -69,40 +92,32 @@ async def read_root():
     return FileResponse("caen_tools/WebService/build/index.html")
 
 
-@app.get("/list_tickets")
-def read_list_tickets():
-    """[WS Backend API] Returns a list of available tickets"""
-
-    data = [(t.value.type_description().__dict__) for t in TicketType]
-    return data
-
+# API part
+# --------
 
 # Device backend API routes
 
 
-@app.get("/device_backend/status")
+@app.get(f"/{Services.DEVBACK.title}/status", tags=[Services.DEVBACK.title])
 async def read_parameters(sender: str = "webcli"):
-    """[WS Backend API] Returns Monitor information"""
-    import random
+    """[WS Backend API] Returns service status information"""
 
     receipt = Receipt(
         sender=sender,
-        executor="device_backend",
+        executor=Services.DEVBACK.title,
         title="status",
-        params={"voltage": random.randint(0, 1000)},
+        params={},
     )
-    print("query", receipt)
     resp = await cli.query(receipt)
-    print("Response", resp)
     return resp
 
 
-@app.post("/device_backend/set_voltage", tags=["device_backend"])
+@app.post(f"/{Services.DEVBACK.title}/set_voltage", tags=[Services.DEVBACK.title])
 async def set_voltage(target_voltage: float = Body(embed=True)):
     """[WS Backend API] Sets voltage on CAEN setup"""
     receipt = Receipt(
         sender="webcli",
-        executor="device_backend",
+        executor=Services.DEVBACK.title,
         title="set_voltage",
         params={"target_voltage": target_voltage},
     )
@@ -110,12 +125,12 @@ async def set_voltage(target_voltage: float = Body(embed=True)):
     return resp
 
 
-@app.post("/device_backend/down", tags=["device_backend"])
+@app.post(f"/{Services.DEVBACK.title}/down", tags=[Services.DEVBACK.title])
 async def down():
     """[WS Backend API] Turns off voltage from CAEN setup"""
     receipt = Receipt(
         sender="webcli",
-        executor="device_backend",
+        executor=Services.DEVBACK.title,
         title="down",
         params={},
     )
@@ -123,12 +138,12 @@ async def down():
     return resp
 
 
-@app.get("/device_backend/params", tags=["device_backend"])
-async def params():
+@app.get(f"/{Services.DEVBACK.title}/params", tags=[Services.DEVBACK.title])
+async def deviceparams():
     """[WS Backend API] Gets parameters of CAEN setup"""
     receipt = Receipt(
         sender="webcli",
-        executor="device_backend",
+        executor=Services.DEVBACK.title,
         title="params",
         params={},
     )
@@ -139,9 +154,21 @@ async def params():
 # Monitor API routes
 
 
-@app.get("/monitor/params", tags=["monitor"])
+@app.get(f"/{Services.MONITOR.title}/status", tags=[Services.MONITOR.title])
+async def monstatus() -> Receipt:
+    """Returns a status of the Monitor service"""
+    receipt_in = Receipt(
+        sender="webcli",
+        executor=Services.MONITOR.title,
+        title="status",
+        params={},
+    )
+    receipt_out = await cli.query(receipt_in)
+    return receipt_out
+
+
+@app.get(f"/{Services.MONITOR.title}/getparams", tags=[Services.MONITOR.title])
 async def paramsdb(
-    paramslist: list[str] = Query(),
     start_timestamp: int = Query(),
     stop_timestamp: int | None = Query(default=None),
 ):
@@ -149,26 +176,26 @@ async def paramsdb(
     receipt = Receipt(
         sender="webcli",
         executor="monitor",
-        title="params",
+        title="get_params",
         params=dict(
-            start_timestamp=start_timestamp,
-            stop_timestamp=stop_timestamp,
-            paramslist=paramslist,
+            start_time=start_timestamp,
+            end_time=stop_timestamp,
         ),
     )
-    # mock behaviour
-    import random
+    resp = await cli.query(receipt)
+    return resp
 
-    outdata = list()
-    for tstamp in range(start_timestamp, stop_timestamp):
-        for ch in range(8):
-            dictrow = dict(
-                chidx=f"0000_0_0_{ch}",
-                timestamp=tstamp,
-            )
-            for p in paramslist:
-                dictrow[p] = random.gauss(ch, 2)
-            outdata.append(dictrow)
 
-    receipt.response = ReceiptResponse(statuscode=1, body={"data": outdata})
-    return receipt
+@app.post(f"/{Services.MONITOR.title}/setparams", tags=[Services.MONITOR.title])
+async def setparamsdb(
+    params: dict[str, dict[str, float]] = Body(embed=True)
+) -> Receipt:
+    """Writes input parameters into database"""
+    receipt = Receipt(
+        sender="webcli",
+        executor=Services.MONITOR.title,
+        title="send_params",
+        params={"params": params},
+    )
+    resp = await cli.query(receipt)
+    return resp
