@@ -72,10 +72,10 @@ The microservice for reading, writing and checking CAEN channel parameters.
 
 ##### Responses
 
-> | status code | response/body | response/body example | comment |
+> | status code | response/body | response/body example |
 > |------|-----|-----|-----|
-> | `1` | `application/json` | `{17 : {"V": 1000, "I" : 0.1, "t": 1720361379}}` | `Here ch_id corresponds to DC layers naming convention.`|
-> | `0` | `text/plain;charset=UTF-8` | `"Something is wrong in the DB. No rows selected."` | `` |
+> | `1` | `application/json` | `'body': {'params_ok' : True, 'interlock' : False,  'interlock check timestamp' : 1720361369, 'params check timestamp' : 1720361379}}` |
+> | `0` | `text/plain;charset=UTF-8` | `"Something is wrong in the DB. No rows selected."` |
 
 </details>
 

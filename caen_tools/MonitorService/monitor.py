@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import json
-from random import random
 
 from caen_tools.connection.server import RouterServer
 from caen_tools.MonitorService.SystemCheck import SystemCheck
@@ -115,6 +114,7 @@ def main():
 
     address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
+    param_file_path = settings.get("monitor", "param_file_path")
     channel_map_path = settings.get("monitor", "channel_map_path")
     with open(channel_map_path) as f:
         channel_map = json.load(f)
@@ -123,7 +123,7 @@ def main():
     )
 
     system_check = SystemCheck(dbpath, max_interlock_check_delta_time)
-    monitor = Monitor(dbpath, system_check, channel_map)
+    monitor = Monitor(dbpath, system_check, channel_map, param_file_path)
 
     dbs = RouterServer(address, "monitor")
 

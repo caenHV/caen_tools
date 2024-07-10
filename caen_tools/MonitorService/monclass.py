@@ -1,14 +1,16 @@
 import json
 from datetime import datetime
+from pathlib import Path
 
 from caen_tools.MonitorService.SystemCheck import SystemCheck
 from caen_tools.ODB_handler.ODB_Handler import ODB_Handler
 
 class Monitor:
-    def __init__(self, dbpath: str, system_check: SystemCheck, channel_map: dict):
+    def __init__(self, dbpath: str, system_check: SystemCheck, channel_map: dict, param_file_path: str):
         self.__odb = ODB_Handler(dbpath)
         self.__system_check = system_check
         self.__channel_map: dict = channel_map
+        self.__param_file_path = Path(param_file_path)
 
     @staticmethod
     def __process_response(res_dict, measurement_time):
@@ -49,7 +51,7 @@ class Monitor:
                            for (chidx, VMon, IMonH, ts, status) in res_list 
                            if chidx in self.__channel_map.keys()]
         health_report = self.__system_check.check_params(params["params"])
-        is_ok = self.__odb.write_params(cooked_res_list)
+        is_ok = self.__odb.write_params(cooked_res_list, self.__param_file_path)
         response = {
             "timestamp" : int(datetime.now().timestamp()),
             "is_ok" : is_ok,
