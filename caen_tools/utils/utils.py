@@ -1,5 +1,6 @@
 import configparser
 import pathlib
+import time
 
 
 def config_processor(configfile):
@@ -18,3 +19,7 @@ def config_processor(configfile):
 
     settings.read(configs)
     return settings
+
+def get_timestamp() -> int:
+    """Returns current timestamp (in seconds)"""
+    return int(time.time())
