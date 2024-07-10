@@ -1,8 +1,14 @@
-import zmq
+"""Base zmq Server implementation"""
+
+from typing import Tuple
+import json
+
+import zmq.asyncio
+from caen_tools.utils.receipt import Receipt, ReceiptJSONDecoder, ReceiptJSONEncoder
 
 
-class DeviceBackendServer:
-    """Implementation of the server (zmq.REP) of DeviceBackend
+class RouterServer:
+    """Implementation of the async server (zmq.ROUTER) (for DeviceBackend firstly)
     (this one receives data from outer space and interacts with the device)
 
     Parameters
@@ -12,14 +18,17 @@ class DeviceBackendServer:
         examples:
             "tcp://localhost:5560" to connect 5560 port
             "tcp://*:5560" to bind 5560 port
+    identity: str
+        identity name of the socket (default is 'deviceback')
     """
 
-    def __init__(self, connect_addr: str):
-        self.context = zmq.Context()
+    def __init__(self, connect_addr: str, identity: str = "deviceback"):
+        self.context = zmq.asyncio.Context()
         self.__configure_context()
 
-        self.socket = self.context.socket(zmq.REP)
+        self.socket = self.context.socket(zmq.ROUTER)
         self.connect_addr = connect_addr
+        self.socket.setsockopt_string(zmq.IDENTITY, identity)
         if "*" in connect_addr:
             self.socket.bind(connect_addr)
         else:
@@ -33,16 +42,16 @@ class DeviceBackendServer:
         self.socket.close()
         self.context.term()
 
-    def recv_json(self) -> list:
-        return self.socket.recv_json()
+    async def recv_receipt(self) -> Tuple[bytes, Receipt]:
+        """Gets a receipt from the socket"""
+        client, _, receipt_str = await self.socket.recv_multipart()
 
-    def recv_json_str(self) -> str:
-        data = self.socket.recv()
-        return data.decode("utf8")
+        receipt = json.loads(receipt_str.decode("utf-8"), cls=ReceiptJSONDecoder)
+        return (client, receipt)
 
-    def send_json(self, data) -> None:
-        return self.socket.send_json(data)
-
-    def send_json_str(self, data: str) -> None:
-        data_js = data.encode("utf8")
-        return self.socket.send(data_js)
+    async def send_receipt(self, address: bytes, receipt: Receipt) -> None:
+        """Sends a status back"""
+        separator = b""
+        receipt_str = json.dumps(receipt, cls=ReceiptJSONEncoder).encode("utf-8")
+        await self.socket.send_multipart([address, separator, receipt_str])
+        return

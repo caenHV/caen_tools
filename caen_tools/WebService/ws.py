@@ -1,27 +1,73 @@
-import asyncio
-import os
+"""WebServer implementation"""
 
-from fastapi import FastAPI, Request
+import os
+from enum import Enum
+from collections import namedtuple
+
+import uvicorn
+
+from fastapi import FastAPI, Body, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from caen_setup.Tickets.TicketType import TicketType
-from caen_tools.connection.client import AsyncClient
-from caen_tools.utils.utils import config_processor
+from fastapi_utils.tasks import repeat_every
 
+from caen_tools.connection.client import AsyncClient
+from caen_tools.utils.utils import config_processor, get_timestamp
+from caen_tools.utils.receipt import Receipt
+
+# Initialization part
+# -------------------
 
 settings = config_processor(None)
 
-QMAXSIZE = settings.getint("webservice", "querylimit")
-SERVADDR = settings.get("webservice", "proxy_address")
+Service = namedtuple("Service", ["title", "address"])
 
-app = FastAPI()
-queue = asyncio.Queue(maxsize=QMAXSIZE)
+
+class Services(Enum):
+    """A list of microservices"""
+
+    @property
+    def title(self):
+        """Returns a title of the microservice"""
+        return self.value.title
+
+    @property
+    def address(self):
+        """Returns an adress of the microservice"""
+        return self.value.address
+
+    DEVBACK = Service("device_backend", settings.get("ws", "device_backend"))
+    MONITOR = Service("monitor", settings.get("ws", "monitor"))
+
+
+tags_metadata = [
+    {
+        "name": Services.DEVBACK.title,
+        "description": "**DeviceBackend** microservice (Direct interaction with CAEN setup)",
+    },
+    {
+        "name": Services.MONITOR.title,
+        "description": "**Monitor** microservice (Interaction with Databases and SystemCheck)",
+    },
+]
+
+app = FastAPI(
+    title="CAEN Manager App",
+    summary="Application to run high voltage on CAEN",
+    version="0.0.2",
+)
+cli = AsyncClient(
+    {s.title: s.address for s in Services},
+    settings.get("ws", "receive_time"),
+)
 
 root = os.path.dirname(os.path.abspath(__file__))
 app.mount(
-    "/static", StaticFiles(directory=os.path.join(root, "build/static")), name="static"
+    "/static",
+    StaticFiles(directory=os.path.join(root, "build", "static")),
+    name="static",
 )
 
 origins = ["*"]
@@ -34,51 +80,156 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-async def fifo_worker():
-    print("Start queue work")
-    cli = AsyncClient(SERVADDR)
-    while True:
-        job = await queue.get()
-        print(f"Get job {job}")
-        resp = await cli.query(job)
-        print(f"Resp: {resp}")
+# Schedulers part
+# ---------------
 
 
 @app.on_event("startup")
-async def startup():
-    asyncio.create_task(fifo_worker())
+@repeat_every(seconds=1)
+async def system_control() -> None:
+    """The scheduled script for
+    continious system control.
+
+    1. Gets parameters of the system
+    2. Sends them to monitor
+    3. Get system check response
+    4. Down voltage in case of failed check
+    """
+
+    params = await deviceparams()  # get device parameters
+    print(params["response"]["timestamp"])
+    dbresp = await setparamsdb(params["response"]["body"]["params"])
+
+    if not dbresp.response["body"]["params_ok"]:
+        print("DOWN")
+        await down()
+
+    return
 
 
 @app.get("/")
 async def read_root():
-    return FileResponse("caen_tools/WebService/build/index.html")
+    """Redirect on frontend page"""
+    return FileResponse(os.path.join(root, "build", "index.html"))
 
 
-@app.get("/list_tickets")
-def read_list_tickets():
-    """[WS Backend API] Returns a list of available tickets"""
+# API part
+# --------
 
-    data = [(t.value.type_description().__dict__) for t in TicketType]
-    return data
+# Device backend API routes
 
 
-@app.get("/params")
-def read_parameters(time):
-    """[WS Backend API] Returns Monitor information"""
+@app.get(f"/{Services.DEVBACK.title}/status", tags=[Services.DEVBACK.title])
+async def read_parameters(sender: str = "webcli"):
+    """[WS Backend API] Returns service status information"""
 
-    from caen_tools.MonitorService.monitor import Monitor
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.DEVBACK.title,
+        title="status",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp
 
-    mon_db = "./monitor.db"
-    res = Monitor.get_results(mon_db, start_time=time)
-    return res
+
+@app.post(f"/{Services.DEVBACK.title}/set_voltage", tags=[Services.DEVBACK.title])
+async def set_voltage(target_voltage: float = Body(embed=True)):
+    """[WS Backend API] Sets voltage on CAEN setup"""
+    receipt = Receipt(
+        sender="webcli",
+        executor=Services.DEVBACK.title,
+        title="set_voltage",
+        params={"target_voltage": target_voltage},
+    )
+    resp = await cli.query(receipt)
+    return resp
 
 
-@app.post("/set_ticket/{name}")
-async def post_ticket(name: str, ticket_args: Request = None):
-    """[WS Backend API] Sends ticket on the setup"""
-    args_dict = await ticket_args.json() if ticket_args else {}
-    tkt_json = {"name": name, "params": args_dict}
-    print(f"Query ticket: {tkt_json}")
-    await queue.put(tkt_json)
-    return {"status": "registered"}
+@app.post(f"/{Services.DEVBACK.title}/down", tags=[Services.DEVBACK.title])
+async def down():
+    """[WS Backend API] Turns off voltage from CAEN setup"""
+    receipt = Receipt(
+        sender="webcli",
+        executor=Services.DEVBACK.title,
+        title="down",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+@app.get(f"/{Services.DEVBACK.title}/params", tags=[Services.DEVBACK.title])
+async def deviceparams():
+    """[WS Backend API] Gets parameters of CAEN setup"""
+    receipt = Receipt(
+        sender="webcli",
+        executor=Services.DEVBACK.title,
+        title="params",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+# Monitor API routes
+
+
+@app.get(f"/{Services.MONITOR.title}/status", tags=[Services.MONITOR.title])
+async def monstatus() -> Receipt:
+    """[WS Backend API] Returns a status of the Monitor service"""
+    receipt_in = Receipt(
+        sender="webcli",
+        executor=Services.MONITOR.title,
+        title="status",
+        params={},
+    )
+    receipt_out = await cli.query(receipt_in)
+    return receipt_out
+
+
+@app.get(f"/{Services.MONITOR.title}/getparams", tags=[Services.MONITOR.title])
+async def paramsdb(
+    start_timestamp: int = Query(),
+    stop_timestamp: int | None = Query(default=None),
+):
+    """[WS Backend API] Returns parameters from the Monitor microservice"""
+    stop_timestamp = get_timestamp() if stop_timestamp is None else stop_timestamp
+    receipt = Receipt(
+        sender="webcli",
+        executor="monitor",
+        title="get_params",
+        params=dict(
+            start_time=start_timestamp,
+            end_time=stop_timestamp,
+        ),
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+@app.post(f"/{Services.MONITOR.title}/setparams", tags=[Services.MONITOR.title])
+async def setparamsdb(
+    params: dict[str, dict[str, float]] = Body(embed=True)
+) -> Receipt:
+    """[WS Backend API] Sends input parameters into Monitor"""
+    receipt = Receipt(
+        sender="webcli",
+        executor=Services.MONITOR.title,
+        title="send_params",
+        params={"params": params},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+def main():
+    """Runs server"""
+    # 192.168.173.217
+    uvicorn.run(
+        "caen_tools.WebService.ws:app", port=8000, log_level="info", host="0.0.0.0"
+    )
+
+
+if __name__ == "__main__":
+    main()

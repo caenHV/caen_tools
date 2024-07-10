@@ -1,20 +1,24 @@
 [project]
 name="caen-tools"
-version="0.0.4"
+version="1.0"
 requires-python=">=3.11"
 dependencies=[
     "pyzmq==25.1.1",
     "caen-setup @ git+https://github.com/caenHV/Setup.git@dev",
+    "psycopg2==2.9.9"
 ]
 
 [project.scripts]
-caen_device_backend = "caen_tools.DeviceBackend.back:main"
+caen_device_backend = "caen_tools.DeviceBackend.main:main"
 caen_proxy = "caen_tools.ProxyService.proxy:main"
 caen_client = "caen_tools.ConsoleClient.client:main"
 caen_monitor = "caen_tools.MonitorService.monitor:main"
+caen_webserver = "caen_tools.WebService.ws:main"
 
 [project.optional-dependencies]
 webservice=[
     "fastapi==0.104.1",
+    "typing_extensions==4.8.0",
+    "fastapi-utils==0.7.0",
     "uvicorn==0.23.2",
 ]
