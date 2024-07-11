@@ -1,6 +1,7 @@
 """WebServer implementation"""
 
 import os
+import argparse
 from enum import Enum
 from collections import namedtuple
 
@@ -20,7 +21,17 @@ from caen_tools.utils.receipt import Receipt
 # Initialization part
 # -------------------
 
-settings = config_processor(None)
+parser = argparse.ArgumentParser(description="CAEN Manager WebService")
+parser.add_argument(
+    "-c",
+    "--config",
+    required=False,
+    type=argparse.FileType("r"),
+    help="Config file",
+    nargs="?",
+)
+args = parser.parse_args()
+settings = config_processor(args.config)
 
 Service = namedtuple("Service", ["title", "address"])
 
@@ -56,7 +67,7 @@ tags_metadata = [
 app = FastAPI(
     title="CAEN Manager App",
     summary="Application to run high voltage on CAEN",
-    version="0.0.2",
+    version="1.0",
 )
 cli = AsyncClient(
     {s.title: s.address for s in Services},
@@ -97,7 +108,7 @@ async def system_control() -> None:
     """
 
     params = await deviceparams()  # get device parameters
-    print(params["response"]["timestamp"])
+    # print(params["response"]["timestamp"])
     dbresp = await setparamsdb(params["response"]["body"]["params"])
 
     if not dbresp.response["body"]["params_ok"]:
@@ -225,9 +236,13 @@ async def setparamsdb(
 
 def main():
     """Runs server"""
+
     # 192.168.173.217
     uvicorn.run(
-        "caen_tools.WebService.ws:app", port=8000, log_level="info", host="0.0.0.0"
+        "caen_tools.WebService.ws:app",
+        port=settings.getint("ws", "port"),
+        log_level="info",
+        host=settings.get("ws", "host"),
     )
 
 
