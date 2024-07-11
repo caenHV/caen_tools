@@ -1,0 +1,37 @@
+name: Build Python package
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: latest
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' 
+      - name: Build frontend
+        shell: bash
+        run: |
+          cd caen_tools/WebService/frontend
+          npm install
+          npm run build
+      - name: Build python package
+        shell: bash
+        run: |
+          python3 -m pip install --upgrade build
+          python3 -m build
+      - name: Store package (whl and source tar)
+        uses: actions/upload-artifact@v4
+        with:
+          name: caen_tools
+          path: dist/
+          retention-days: 1

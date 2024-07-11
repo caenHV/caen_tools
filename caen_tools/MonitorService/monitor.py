@@ -136,7 +136,7 @@ def main():
     dbpath = settings.get("monitor", "dbpath")
     param_file_path = settings.get("monitor", "param_file_path")
     channel_map_path = settings.get("monitor", "channel_map_path")
-    with open(channel_map_path) as f:
+    with open(channel_map_path, encoding="utf-8") as f:
         channel_map = json.load(f)
     max_interlock_check_delta_time = int(
         settings.get("monitor", "max_interlock_check_delta_time")
