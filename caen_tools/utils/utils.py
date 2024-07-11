@@ -6,7 +6,7 @@ import time
 def root_project() -> Path:
     """Returns root directory of this project"""
 
-    return Path(__file__).parent.parent.parent
+    return Path(__file__).parent.parent
 
 
 def config_processor(configfile):
@@ -14,11 +14,11 @@ def config_processor(configfile):
     (if configfile is None this uses default config)
     """
 
-    default_config = root_project() / "config.ini"
+    default_config = root_project() / "configs" / "config.ini"
     configs = [default_config]
 
     settings = configparser.ConfigParser(
-        defaults={"root_project": root_project()},
+        defaults={"root_configs": root_project() / "configs"},
         interpolation=configparser.ExtendedInterpolation(),
     )
     if configfile is not None:
