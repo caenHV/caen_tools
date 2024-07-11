@@ -5,22 +5,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: latest
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11' 
-      - name: Build package
+      - name: Build frontend
         shell: bash
         run: |
-          ls -l
           cd caen_tools/WebService/frontend
-          git submodule init
-          git submodule update
-          ls -l caen_tools/WebService/frontend
           npm install
           npm run build
-          ls -l caen_tools/WebService/frontend
-
+      - name: Build python package
+        shell: bash
+        run: |
+          python3 -m pip install --upgrade build
+          python3 -m build
+      - name: Store package (whl and source tar)
+        uses: actions/upload-artifact@v4
+        with:
+          name: caen_tools
+          path: dist/
+          retention-days: 1
