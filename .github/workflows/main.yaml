@@ -1,0 +1,21 @@
+name: Build Python package
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: latest
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' 
+      - name: Build package
+        shell: bash
+        run: |
+          ls -l
+          ls -l caen_tools/WebService/frontend
+          cd caen_tools/WebService/frontend
+
