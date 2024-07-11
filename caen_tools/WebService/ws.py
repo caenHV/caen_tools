@@ -66,7 +66,7 @@ cli = AsyncClient(
 root = os.path.dirname(os.path.abspath(__file__))
 app.mount(
     "/static",
-    StaticFiles(directory=os.path.join(root, "build", "static")),
+    StaticFiles(directory=os.path.join(root, "frontend", "build", "static")),
     name="static",
 )
 
@@ -110,7 +110,7 @@ async def system_control() -> None:
 @app.get("/")
 async def read_root():
     """Redirect on frontend page"""
-    return FileResponse(os.path.join(root, "build", "index.html"))
+    return FileResponse(os.path.join(root, "frontend", "build", "index.html"))
 
 
 # API part

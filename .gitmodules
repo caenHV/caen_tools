@@ -1,0 +1,3 @@
+[submodule "caen_tools/WebService/frontend"]
+	path = caen_tools/WebService/frontend
+	url = git@github.com:caenHV/frontend_webpage.git

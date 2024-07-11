@@ -23,7 +23,7 @@ Implementation of the architecture for CAEN control
 1. Frontend page (CAEN Manager) can be found https://github.com/caenHV/frontend_webpage
     1. Clone this repo and go to the folder
     1. Execute `npm run build`
-1. Copy `build` folder into `caen_tools/WebService` folder (replacing the one that exists already)
+1. Copy `build` folder into `caen_tools/WebService/frontend/` folder (replacing the one that exists already)
 1. It's done. Now WebService will use built frontend
 
 ### DeviceBackend
