@@ -1,4 +1,2 @@
-include config.ini
-include channel_map.json
-include test_config.json
+graft caen_tools/configs
 graft caen_tools/WebService/frontend/build
