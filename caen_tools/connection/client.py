@@ -6,7 +6,7 @@ import json
 import zmq
 import zmq.asyncio
 from zmq.utils import jsonapi
-from caen_tools.utils.receipt import Receipt, ReceiptJSONEncoder
+from caen_tools.utils.receipt import Receipt, ReceiptJSONEncoder, ReceiptJSONDecoder
 from caen_tools.utils.resperrs import RResponseErrors
 
 
@@ -82,15 +82,16 @@ class AsyncClient(BaseClient):
 
             try:
                 response = await sock.recv_multipart()
-            except zmq.error.Again:
-                receipt.response = RResponseErrors.GatewayTimeout(
-                    f"No response from {receipt.executor} service"
+                receipt_out = json.loads(
+                    response[1].decode("utf-8"), cls=ReceiptJSONDecoder
                 )
-                return receipt
-
-            responsejs = jsonapi.loads(response[1])
+            except zmq.error.Again:
+                receipt_out = receipt
+                receipt_out.response = RResponseErrors.GatewayTimeout(
+                    f"No response from {receipt_out.executor} service"
+                )
 
         s.setsockopt(zmq.LINGER, 0)
         s.close()
 
-        return responsejs
+        return receipt_out

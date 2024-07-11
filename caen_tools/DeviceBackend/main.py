@@ -2,14 +2,16 @@
 
 import asyncio
 import argparse
+import logging
 from caen_setup import Handler
 
 from caen_tools.connection.server import RouterServer
 from caen_tools.DeviceBackend.apifactory import APIFactory
-from caen_tools.utils.utils import config_processor
+from caen_tools.utils.utils import config_processor, get_logging_config
 
 NUM_ASYNC_TASKS = 5
 sem = asyncio.Semaphore(NUM_ASYNC_TASKS)
+logger = logging.getLogger(__file__)
 
 
 async def process_message(dbs: RouterServer, handler: Handler) -> None:
@@ -27,10 +29,10 @@ async def process_message(dbs: RouterServer, handler: Handler) -> None:
         asyncio.ensure_future(process_message(dbs, handler))
 
         client_address, receipt = await dbs.recv_receipt()
-        print("Received", receipt, "from", client_address)
+        logging.info("Received %s from %s", receipt, client_address)
         out_receipt = APIFactory.execute_receipt(receipt, handler)
         await dbs.send_receipt(client_address, out_receipt)
-        print("and send back")
+        logging.info("send response to client %s", client_address)
 
     return
 
@@ -50,6 +52,11 @@ def main():
     address = settings.get("device", "address")
     map_config = settings.get("device", "map_config")
 
+    get_logging_config(
+        level=settings.get("device", "loglevel"),
+        filepath=settings.get("device", "logfile"),
+    )
+
     dbs = RouterServer(address, "devback")
     handler = Handler(map_config, dev_mode=True)
 
@@ -58,10 +65,13 @@ def main():
         asyncio.ensure_future(process_message(dbs, handler))
         loop.run_forever()
     except KeyboardInterrupt:
-        print("keyboard interrupt")
+        logging.info("Keyboard Interrupt. Finish the program")
     finally:
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.close()
+        pending = asyncio.all_tasks(loop=loop)
+        for task in pending:
+            task.cancel()
+            logging.debug("Close task %s", task)
+        logging.info("Final program close")
 
 
 if __name__ == "__main__":

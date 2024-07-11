@@ -23,6 +23,11 @@ class ReceiptResponse:
 
 
 @dataclass
+class ReceiptResponseError(ReceiptResponse):
+    """Defines a structure of the error receipt response"""
+
+
+@dataclass
 class Receipt:
     """A message structure for conversation between microservices
 

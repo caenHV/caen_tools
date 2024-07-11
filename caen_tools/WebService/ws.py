@@ -7,7 +7,8 @@ from collections import namedtuple
 
 import uvicorn
 
-from fastapi import FastAPI, Body, Query
+from fastapi import FastAPI, Body, Query, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -16,7 +17,7 @@ from fastapi_utils.tasks import repeat_every
 
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.utils import config_processor, get_timestamp
-from caen_tools.utils.receipt import Receipt
+from caen_tools.utils.receipt import Receipt, ReceiptResponseError
 
 # Initialization part
 # -------------------
@@ -108,8 +109,8 @@ async def system_control() -> None:
     """
 
     params = await deviceparams()  # get device parameters
-    # print(params["response"]["timestamp"])
-    dbresp = await setparamsdb(params["response"]["body"]["params"])
+    # print(params.response.timestamp)
+    dbresp = await setparamsdb(params.response.body["params"])
 
     if not dbresp.response["body"]["params_ok"]:
         print("DOWN")
@@ -122,6 +123,7 @@ async def system_control() -> None:
 async def read_root():
     """Redirect on frontend page"""
     return FileResponse(os.path.join(root, "frontend", "build", "index.html"))
+
 
 
 # API part
@@ -154,6 +156,9 @@ async def set_voltage(target_voltage: float = Body(embed=True)):
         params={"target_voltage": target_voltage},
     )
     resp = await cli.query(receipt)
+    if isinstance(resp.response, ReceiptResponseError):
+        data = resp.response
+        raise HTTPException(status_code=data.statuscode, detail=data.body)
     return resp
 
 
@@ -167,6 +172,9 @@ async def down():
         params={},
     )
     resp = await cli.query(receipt)
+    if isinstance(resp.response, ReceiptResponseError):
+        data = resp.response
+        raise HTTPException(status_code=data.statuscode, detail=data.body)
     return resp
 
 
@@ -216,6 +224,9 @@ async def paramsdb(
         ),
     )
     resp = await cli.query(receipt)
+    if isinstance(resp.response, ReceiptResponseError):
+        data = resp.response
+        raise HTTPException(status_code=data.statuscode, detail=data.body)
     return resp
 
 
