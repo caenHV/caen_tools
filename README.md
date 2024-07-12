@@ -23,7 +23,7 @@ Implementation of the architecture for CAEN control
 1. Frontend page (CAEN Manager) can be found https://github.com/caenHV/frontend_webpage
     1. Clone this repo and go to the folder
     1. Execute `npm run build`
-1. Copy `build` folder into `caen_tools/WebService` folder (replacing the one that exists already)
+1. Copy `build` folder into `caen_tools/WebService/frontend/` folder (replacing the one that exists already)
 1. It's done. Now WebService will use built frontend
 
 ### DeviceBackend
@@ -60,15 +60,24 @@ Tested on `python==3.11.2` with extra modules described in `requirements.txt`
 
 ## Running
 
+### Developer mode 
+
 * Build module via pip
 ```bash
 pip install -e .
 ```
 * Run `WebService` (in another bash) through 
 ```bash
-uvicorn caen_tools.WebService.ws:app --reload
+uvicorn caen_tools.WebService.ws:app
 ```
 to deploy webserver
+
+### Production mode
+* Build the package from the directory containing `pyproject.toml`
+```bash
+python3 -m pip install --upgrade build
+python3 -m build
+```
 
 ## Final view
 Finally this project must be installed easily via pip like

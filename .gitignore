@@ -2,6 +2,7 @@
 venv/
 *egg-info*
 *.ipynb*
-*.sqlite
+*.sqlite*
 *.db
 *build*
+dist

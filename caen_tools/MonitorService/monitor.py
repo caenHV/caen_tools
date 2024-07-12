@@ -3,12 +3,13 @@
 import argparse
 import asyncio
 import json
+import logging
 
 from caen_tools.connection.server import RouterServer
 from caen_tools.MonitorService.SystemCheck import SystemCheck
 from caen_tools.MonitorService.monclass import Monitor
 from caen_tools.utils.receipt import Receipt, ReceiptResponse
-from caen_tools.utils.utils import config_processor
+from caen_tools.utils.utils import config_processor, get_logging_config
 
 NUM_ASYNC_TASKS = 5
 sem = asyncio.Semaphore(NUM_ASYNC_TASKS)
@@ -21,12 +22,13 @@ async def process_message(dbs: RouterServer, monitor: Monitor) -> None:
         asyncio.ensure_future(process_message(dbs, monitor))
 
         client_address, receipt = await dbs.recv_receipt()
-        print("Received", receipt, "from", client_address)
+        logging.info("Received %s from %s", receipt.title, client_address)
+        logging.debug("Full receipt %s", receipt)
 
         out_receipt = APIFactory.execute_receipt(receipt, monitor)
 
         await dbs.send_receipt(client_address, out_receipt)
-        print("and send back")
+        logging.info("send response to client %s", client_address)
 
     return
 
@@ -136,10 +138,15 @@ def main():
     dbpath = settings.get("monitor", "dbpath")
     param_file_path = settings.get("monitor", "param_file_path")
     channel_map_path = settings.get("monitor", "channel_map_path")
-    with open(channel_map_path) as f:
+    with open(channel_map_path, encoding="utf-8") as f:
         channel_map = json.load(f)
     max_interlock_check_delta_time = int(
         settings.get("monitor", "max_interlock_check_delta_time")
+    )
+
+    get_logging_config(
+        level=settings.get("monitor", "loglevel"),
+        filepath=settings.get("monitor", "logfile"),
     )
 
     system_check = SystemCheck(dbpath, max_interlock_check_delta_time)
@@ -152,10 +159,13 @@ def main():
         asyncio.ensure_future(process_message(dbs, monitor))
         loop.run_forever()
     except KeyboardInterrupt:
-        print("keyboard interrupt")
+        logging.info("Keyboard Interrupt. Finish the program")
     finally:
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.close()
+        pending = asyncio.all_tasks(loop=loop)
+        for task in pending:
+            task.cancel()
+            logging.debug("Close task %s", task)
+        logging.info("Final program close")
 
 
 if __name__ == "__main__":

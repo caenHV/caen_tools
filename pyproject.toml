@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name="caen-tools"
-version="1.0"
+version="1.2"
 requires-python=">=3.11"
 dependencies=[
     "pyzmq==25.1.1",
@@ -10,8 +14,6 @@ dependencies=[
 
 [project.scripts]
 caen_device_backend = "caen_tools.DeviceBackend.main:main"
-caen_proxy = "caen_tools.ProxyService.proxy:main"
-caen_client = "caen_tools.ConsoleClient.client:main"
 caen_monitor = "caen_tools.MonitorService.monitor:main"
 caen_webserver = "caen_tools.WebService.ws:main"
 
@@ -21,4 +23,5 @@ webservice=[
     "typing_extensions==4.8.0",
     "fastapi-utils==0.7.0",
     "uvicorn==0.23.2",
+    "typing-inspect==0.9.0",
 ]
