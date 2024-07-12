@@ -14,8 +14,6 @@ dependencies=[
 
 [project.scripts]
 caen_device_backend = "caen_tools.DeviceBackend.main:main"
-caen_proxy = "caen_tools.ProxyService.proxy:main"
-caen_client = "caen_tools.ConsoleClient.client:main"
 caen_monitor = "caen_tools.MonitorService.monitor:main"
 caen_webserver = "caen_tools.WebService.ws:main"
 

@@ -1,14 +1,15 @@
 """WebServer implementation"""
 
-import os
-import argparse
 from enum import Enum
 from collections import namedtuple
 
+import os
+import argparse
+import logging
+
 import uvicorn
 
-from fastapi import FastAPI, Body, Query, HTTPException
-from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI, Body, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -16,8 +17,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_utils.tasks import repeat_every
 
 from caen_tools.connection.client import AsyncClient
-from caen_tools.utils.utils import config_processor, get_timestamp
-from caen_tools.utils.receipt import Receipt, ReceiptResponseError
+from caen_tools.utils.utils import config_processor, get_timestamp, get_logging_config
+from caen_tools.utils.receipt import Receipt
+from caen_tools.WebService.utils import response_provider
 
 # Initialization part
 # -------------------
@@ -31,8 +33,13 @@ parser.add_argument(
     help="Config file",
     nargs="?",
 )
-args = parser.parse_args()
-settings = config_processor(args.config)
+console_args = parser.parse_args()
+settings = config_processor(console_args.config)
+
+get_logging_config(
+    level=settings.get("ws", "loglevel"),
+    filepath=settings.get("ws", "logfile"),
+)
 
 Service = namedtuple("Service", ["title", "address"])
 
@@ -108,12 +115,12 @@ async def system_control() -> None:
     4. Down voltage in case of failed check
     """
 
+    logging.info("Start system control script")
     params = await deviceparams()  # get device parameters
-    # print(params.response.timestamp)
     dbresp = await setparamsdb(params.response.body["params"])
 
     if not dbresp.response["body"]["params_ok"]:
-        print("DOWN")
+        logging.error("Bad device parameters. Emergency DownVoltage")
         await down()
 
     return
@@ -125,7 +132,6 @@ async def read_root():
     return FileResponse(os.path.join(root, "frontend", "build", "index.html"))
 
 
-
 # API part
 # --------
 
@@ -133,7 +139,8 @@ async def read_root():
 
 
 @app.get(f"/{Services.DEVBACK.title}/status", tags=[Services.DEVBACK.title])
-async def read_parameters(sender: str = "webcli"):
+@response_provider
+async def read_parameters(sender: str = "webcli") -> Receipt:
     """[WS Backend API] Returns service status information"""
 
     receipt = Receipt(
@@ -147,7 +154,8 @@ async def read_parameters(sender: str = "webcli"):
 
 
 @app.post(f"/{Services.DEVBACK.title}/set_voltage", tags=[Services.DEVBACK.title])
-async def set_voltage(target_voltage: float = Body(embed=True)):
+@response_provider
+async def set_voltage(target_voltage: float = Body(embed=True)) -> Receipt:
     """[WS Backend API] Sets voltage on CAEN setup"""
     receipt = Receipt(
         sender="webcli",
@@ -156,14 +164,12 @@ async def set_voltage(target_voltage: float = Body(embed=True)):
         params={"target_voltage": target_voltage},
     )
     resp = await cli.query(receipt)
-    if isinstance(resp.response, ReceiptResponseError):
-        data = resp.response
-        raise HTTPException(status_code=data.statuscode, detail=data.body)
     return resp
 
 
 @app.post(f"/{Services.DEVBACK.title}/down", tags=[Services.DEVBACK.title])
-async def down():
+@response_provider
+async def down() -> Receipt:
     """[WS Backend API] Turns off voltage from CAEN setup"""
     receipt = Receipt(
         sender="webcli",
@@ -172,13 +178,11 @@ async def down():
         params={},
     )
     resp = await cli.query(receipt)
-    if isinstance(resp.response, ReceiptResponseError):
-        data = resp.response
-        raise HTTPException(status_code=data.statuscode, detail=data.body)
     return resp
 
 
 @app.get(f"/{Services.DEVBACK.title}/params", tags=[Services.DEVBACK.title])
+@response_provider
 async def deviceparams():
     """[WS Backend API] Gets parameters of CAEN setup"""
     receipt = Receipt(
@@ -195,6 +199,7 @@ async def deviceparams():
 
 
 @app.get(f"/{Services.MONITOR.title}/status", tags=[Services.MONITOR.title])
+@response_provider
 async def monstatus() -> Receipt:
     """[WS Backend API] Returns a status of the Monitor service"""
     receipt_in = Receipt(
@@ -208,15 +213,16 @@ async def monstatus() -> Receipt:
 
 
 @app.get(f"/{Services.MONITOR.title}/getparams", tags=[Services.MONITOR.title])
+@response_provider
 async def paramsdb(
     start_timestamp: int = Query(),
     stop_timestamp: int | None = Query(default=None),
-):
+) -> Receipt:
     """[WS Backend API] Returns parameters from the Monitor microservice"""
     stop_timestamp = get_timestamp() if stop_timestamp is None else stop_timestamp
     receipt = Receipt(
         sender="webcli",
-        executor="monitor",
+        executor=Services.MONITOR.title,
         title="get_params",
         params=dict(
             start_time=start_timestamp,
@@ -224,13 +230,11 @@ async def paramsdb(
         ),
     )
     resp = await cli.query(receipt)
-    if isinstance(resp.response, ReceiptResponseError):
-        data = resp.response
-        raise HTTPException(status_code=data.statuscode, detail=data.body)
     return resp
 
 
 @app.post(f"/{Services.MONITOR.title}/setparams", tags=[Services.MONITOR.title])
+@response_provider
 async def setparamsdb(
     params: dict[str, dict[str, float]] = Body(embed=True)
 ) -> Receipt:
@@ -248,7 +252,7 @@ async def setparamsdb(
 def main():
     """Runs server"""
 
-    # 192.168.173.217
+    # 192.168.173.217:8000
     uvicorn.run(
         "caen_tools.WebService.ws:app",
         port=settings.getint("ws", "port"),

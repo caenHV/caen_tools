@@ -45,7 +45,7 @@ def get_logging_config(
     handlers = []
     if console_output:
         handlers.append(logging.StreamHandler())
-    if filepath is not None:
+    if (filepath is not None) and not (filepath == ""):
         handlers.append(logging.FileHandler(filepath))
     if isinstance(level, str):
         level = logging.getLevelName(level.upper())
@@ -55,7 +55,7 @@ def get_logging_config(
         level=level,
         encoding="utf-8",
         format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y/%m/%d/ %H:%M:%S",
+        datefmt="%Y/%m/%d %H:%M:%S",
     )
     logging.debug("Set logging settings")
     return

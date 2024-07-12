@@ -3,9 +3,10 @@
 from abc import ABC
 from typing import Dict
 import json
+import logging
 import zmq
 import zmq.asyncio
-from zmq.utils import jsonapi
+
 from caen_tools.utils.receipt import Receipt, ReceiptJSONEncoder, ReceiptJSONDecoder
 from caen_tools.utils.resperrs import RResponseErrors
 
@@ -44,6 +45,7 @@ class AsyncClient(BaseClient):
     def __init__(
         self, connect_addresses: Dict[str, str], receive_time: int | None = None
     ):
+        logging.debug("Start AsyncCli initialization")
         context = zmq.asyncio.Context()
         self.socket = context.socket(zmq.DEALER)
         self.connect_addresses = connect_addresses
@@ -68,6 +70,7 @@ class AsyncClient(BaseClient):
         """
 
         if receipt.executor not in self.connect_addresses:
+            logging.error("Connect address %s is not allowed", receipt.executor)
             receipt.response = RResponseErrors.NotFound(
                 f"Executor {receipt.executor} is not found"
             )
@@ -86,6 +89,7 @@ class AsyncClient(BaseClient):
                     response[1].decode("utf-8"), cls=ReceiptJSONDecoder
                 )
             except zmq.error.Again:
+                logging.warning("No response from executor %s", receipt.executor)
                 receipt_out = receipt
                 receipt_out.response = RResponseErrors.GatewayTimeout(
                     f"No response from {receipt_out.executor} service"

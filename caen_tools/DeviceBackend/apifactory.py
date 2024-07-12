@@ -1,6 +1,7 @@
 """Defines API methods for DeviceBackend microservice"""
 
 import json
+import logging
 from caen_setup import Handler
 from caen_setup.Tickets.Tickets import (
     Ticket,
@@ -44,6 +45,7 @@ class APIMethods:
     @staticmethod
     def status(receipt: Receipt, h: Handler) -> Receipt:
         """Returns statuscode of the service"""
+        logging.debug("Start status ticket")
         receipt.response = ReceiptResponse(statuscode=1, body={})
         return receipt
 
@@ -55,6 +57,7 @@ class APIMethods:
         -----
         receipt.params must correspond SetVoltage_Ticket.type_description
         """
+        logging.debug("Start set_voltage ticket")
         ticket = SetVoltage_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
         return receipt
@@ -68,6 +71,7 @@ class APIMethods:
         receipt.params must correspond GetParams_Ticket.type_description
         """
 
+        logging.debug("Start get params ticket")
         ticket = GetParams_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
         rawdict = receipt.response.body["params"]
@@ -86,6 +90,8 @@ class APIMethods:
     @staticmethod
     def down(receipt: Receipt, h: Handler) -> Receipt:
         """Turns off voltage on the device"""
+
+        logging.debug("Start down ticket")
         ticket = Down_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
         return receipt
@@ -93,6 +99,8 @@ class APIMethods:
     @staticmethod
     def wrongroute(receipt: Receipt) -> Receipt:
         """Default answer for the wrong title field in the receipt"""
+
+        logging.debug("Start wrong_route ticket")
         receipt.response = ReceiptResponse(
             statuscode=404, body="this api method is not found"
         )
