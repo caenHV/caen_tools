@@ -19,7 +19,7 @@ from fastapi_utils.tasks import repeat_every
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.utils import config_processor, get_timestamp, get_logging_config
 from caen_tools.utils.receipt import Receipt
-from caen_tools.WebService.utils import response_provider
+from caen_tools.WebService.utils import response_provider, send_mail
 
 # Initialization part
 # -------------------
@@ -123,6 +123,20 @@ async def system_control() -> None:
         logging.error("Bad device parameters. Emergency DownVoltage")
         await down()
 
+    return
+
+
+@app.on_event("shutdown")
+async def last_scream() -> None:
+    """Actions on shutdown server"""
+
+    logging.info("Start server shutdown actions")
+    
+    subslist = list(
+        filter(lambda x: ("@" in x), settings.get("ws", "subscribers").split("\n"))
+    )
+    logging.info("Send shutdown info emails to %s", subslist)
+    send_mail(subslist, "CAEN WebServer shutdown", "Hello! WebServer shutdown.")
     return
 
 
