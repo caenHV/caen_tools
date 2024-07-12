@@ -2,6 +2,7 @@
 
 from typing import Tuple
 import json
+import logging
 
 import zmq.asyncio
 from caen_tools.utils.receipt import Receipt, ReceiptJSONDecoder, ReceiptJSONEncoder
@@ -36,6 +37,7 @@ class RouterServer:
 
     def __configure_context(self):
         self.context.setsockopt(zmq.RCVHWM, 1)
+        self.context.setsockopt(zmq.SNDTIMEO, 10_000)
 
     def __del__(self):
         self.socket.setsockopt(zmq.LINGER, 0)
@@ -45,6 +47,7 @@ class RouterServer:
     async def recv_receipt(self) -> Tuple[bytes, Receipt]:
         """Gets a receipt from the socket"""
         client, _, receipt_str = await self.socket.recv_multipart()
+        logging.debug("Success recv_multipart from %s", client)
 
         receipt = json.loads(receipt_str.decode("utf-8"), cls=ReceiptJSONDecoder)
         return (client, receipt)
@@ -53,5 +56,9 @@ class RouterServer:
         """Sends a status back"""
         separator = b""
         receipt_str = json.dumps(receipt, cls=ReceiptJSONEncoder).encode("utf-8")
-        await self.socket.send_multipart([address, separator, receipt_str])
+        try:
+            await self.socket.send_multipart([address, separator, receipt_str])
+            logging.debug("Success send multipart to %s", address)
+        except zmq.error.Again:
+            logging.error("Send_multipart failed. Exeeded sending time")
         return
