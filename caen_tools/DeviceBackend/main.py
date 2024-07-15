@@ -58,7 +58,7 @@ def main():
     )
 
     dbs = RouterServer(address, "devback")
-    handler = Handler(map_config, dev_mode=True)
+    handler = Handler(map_config)
 
     loop = asyncio.get_event_loop()
     try:
