@@ -62,10 +62,12 @@ The microservice for execution of the tickets on the CAEN device.
 
 **[device]** section
 
-| title | description | default value |
+| title:type | description | default value |
 |------|-----|-----|
-| `map_config` | DC Layer map config | `./test_config.json` |
-| `host` | host name of the DeviceBackend service | `localhost` |
-| `protocol` | conversation protocol of the DeviceBackend | `tcp` |
-| `port` | port of the DeviceBackend | `5570` |
-| `address` | device backend address for binding | `${protocol}://*:${port}` |
+| `map_config:str` | DC Layer map config | `./test_config.json` |
+| `host:str` | host name of the DeviceBackend service | `localhost` |
+| `protocol:str` | conversation protocol of the DeviceBackend | `tcp` |
+| `port:int` | port of the DeviceBackend | `5570` |
+| `address:str` | device backend address for binding | `${protocol}://*:${port}` |
+| `fake_board:bool` | use fake (`true``) or real (`false`) board interface | `true` |
+| `refresh_time:int` | number of seconds to update data on board | `1` |

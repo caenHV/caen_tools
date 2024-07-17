@@ -40,6 +40,10 @@ get_logging_config(
     level=settings.get("ws", "loglevel"),
     filepath=settings.get("ws", "logfile"),
 )
+logging.info(
+    "Successfuly started WebService with arguments %s",
+    dict(settings.items("ws")),
+)
 
 Service = namedtuple("Service", ["title", "address"])
 
@@ -131,7 +135,7 @@ async def last_scream() -> None:
     """Actions on shutdown server"""
 
     logging.info("Start server shutdown actions")
-    
+
     subslist = list(
         filter(lambda x: ("@" in x), settings.get("ws", "subscribers").split("\n"))
     )

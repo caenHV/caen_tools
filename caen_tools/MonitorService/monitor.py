@@ -148,6 +148,10 @@ def main():
         level=settings.get("monitor", "loglevel"),
         filepath=settings.get("monitor", "logfile"),
     )
+    logging.info(
+        "Successfuly started Monitor with arguments %s",
+        dict(settings.items("monitor")),
+    )
 
     system_check = SystemCheck(dbpath, max_interlock_check_delta_time)
     monitor = Monitor(dbpath, system_check, channel_map, param_file_path)
