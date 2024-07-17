@@ -51,14 +51,22 @@ def main():
     settings = config_processor(args.config)
     address = settings.get("device", "address")
     map_config = settings.get("device", "map_config")
+    fake_board = settings.getboolean("device", "fake_board")
+    handler_refresh_time = settings.getint("device", "refersh_time")
 
     get_logging_config(
         level=settings.get("device", "loglevel"),
         filepath=settings.get("device", "logfile"),
     )
+    logging.info(
+        "Successfuly started DeviceBackend with arguments %s",
+        dict(settings.items("device")),
+    )
 
     dbs = RouterServer(address, "devback")
-    handler = Handler(map_config)
+    handler = Handler(
+        map_config, refresh_time=handler_refresh_time, fake_board=fake_board
+    )
 
     loop = asyncio.get_event_loop()
     try:
