@@ -13,8 +13,9 @@ class Monitor:
         system_check: SystemCheck,
         channel_map: dict,
         param_file_path: str,
+        interlock_db_uri: str
     ):
-        self.__odb = ODB_Handler(dbpath)
+        self.__odb = ODB_Handler(dbpath, interlock_db_uri)
         self.__system_check = system_check
         self.__channel_map: dict = channel_map
         self.__param_file_path = Path(param_file_path)

@@ -3,13 +3,23 @@ import json
 from pathlib import Path
 import sqlite3
 import warnings
+from urllib.parse import urlparse
 
 import psycopg2
 
 
 class ODB_Handler:
-    def __init__(self, dbpath: str, cleaning_frequency: int = 100):
+    def __init__(self, dbpath: str, interlock_db_uri: str, cleaning_frequency: int = 100):
         self.__dbpath = dbpath
+        parsed_uri = urlparse(interlock_db_uri)
+        self.__interlock_db_credentials = {
+                                        'dbname': parsed_uri.hostname,
+                                        'user': parsed_uri.username,
+                                        'password': parsed_uri.password,
+                                        'port': parsed_uri.port,
+                                        'host': parsed_uri.scheme
+                                    }
+
         self.con = sqlite3.connect(self.__dbpath)
         self.con.execute(
             "CREATE TABLE IF NOT EXISTS data (idx INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, voltage REAL, current REAL, t INTEGER, status INTEGER);"
@@ -21,17 +31,12 @@ class ODB_Handler:
         is_ok = True
         res = None
         try:
-            conn = psycopg2.connect(
-                database="vepp2k",
-                host="sndas0",
-                user="kmd",
-                password="kmd",
-                port="5432",
-            )
+            conn = psycopg2.connect(**self.__interlock_db_credentials)
             with conn.cursor() as cursor:
-                res = cursor.execute(
-                    "SELECT value, time from values where property = 'KMD_Interlock'"
-                ).fetchone()
+                cursor.execute(
+                    "SELECT value, time from values where property = 'KMD_Interlock';"
+                )
+                res = cursor.fetchone()
 
         except Exception as e:
             is_ok = False
@@ -110,7 +115,7 @@ class ODB_Handler:
 
         return is_ok
 
-    def get_params(self, start: int, end: int) -> dict | None:
+    def get_params(self, start: int, end: int) -> list | None:
         is_ok = True
         with self.con as con:
             try:
