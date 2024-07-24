@@ -23,6 +23,7 @@ jobs:
         run: |
           cd caen_tools/WebService/frontend
           npm install
+          export REACT_APP_CAEN=production
           npm run build
       - name: Build python package
         shell: bash
