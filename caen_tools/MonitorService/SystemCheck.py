@@ -4,14 +4,14 @@ from caen_tools.ODB_handler.ODB_Handler import ODB_Handler
 
 
 class SystemCheck:
-    def __init__(self, dbpath: str, max_interlock_check_delta_time: int = 100):
+    def __init__(self, dbpath: str, interlock_db_uri: str, max_interlock_check_delta_time: int = 100):
         self.__interlock = True
         self.__last_interlock_check = int(datetime.now().timestamp())
         self.__max_interlock_check_delta_time = max_interlock_check_delta_time
         self.__are_params_ok = True
         self.__last_params_check = int(datetime.now().timestamp())
         
-        self.__odb = ODB_Handler(dbpath)
+        self.__odb = ODB_Handler(dbpath, interlock_db_uri)
     
     def update_state(self):
         delta_time = int(datetime.now().timestamp()) - self.__last_interlock_check
