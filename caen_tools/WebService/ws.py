@@ -181,7 +181,9 @@ async def set_voltage(target_voltage: float = Body(embed=True)) -> Receipt:
         title="set_voltage",
         params={"target_voltage": target_voltage},
     )
+    logging.debug("Start setting voltage %s", target_voltage)
     resp = await cli.query(receipt)
+    logging.debug("Voltage set on %s", target_voltage)
     return resp
 
 
@@ -274,8 +276,8 @@ def main():
     uvicorn.run(
         "caen_tools.WebService.ws:app",
         port=settings.getint("ws", "port"),
-        log_level="info",
         host=settings.get("ws", "host"),
+        log_config=None,
     )
 
 
