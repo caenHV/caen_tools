@@ -5,11 +5,12 @@ from collections import namedtuple
 
 import os
 import argparse
+import asyncio
 import logging
 
 import uvicorn
 
-from fastapi import FastAPI, Body, Query
+from fastapi import FastAPI, Body, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_utils.tasks import repeat_every
 
 from caen_tools.connection.client import AsyncClient
+from caen_tools.connection.websockpub import WSPubManager
 from caen_tools.utils.utils import config_processor, get_timestamp, get_logging_config
 from caen_tools.utils.receipt import Receipt
 from caen_tools.WebService.utils import response_provider, send_mail
@@ -85,6 +87,7 @@ cli = AsyncClient(
     {s.title: s.address for s in Services},
     settings.get("ws", "receive_time"),
 )
+wspub = WSPubManager()
 
 root = os.path.dirname(os.path.abspath(__file__))
 app.mount(
@@ -114,13 +117,16 @@ async def system_control() -> None:
     continious system control.
 
     1. Gets parameters of the system
-    2. Sends them to monitor
-    3. Get system check response
-    4. Down voltage in case of failed check
+    2. Broadcast them to subscribers
+    3. Sends them to monitor
+    4. Get system check response
+    5. Down voltage in case of failed check
     """
 
     logging.info("Start system control script")
     params = await deviceparams()  # get device parameters
+    wspayload = {"body": params.response.body, "timestamp": params.response.timestamp}
+    await wspub.broadcast(wspayload) # Broadcast parameters via websocket connection
     dbresp = await setparamsdb(params.response.body["params"])
 
     if not dbresp.response["body"]["params_ok"]:
@@ -213,6 +219,19 @@ async def deviceparams():
     )
     resp = await cli.query(receipt)
     return resp
+
+
+@app.websocket(f"/{Services.DEVBACK.title}/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """[WS Backend API] Websocket endpoint
+    to get CAEN setup parameters every second"""
+    await wspub.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        wspub.disconnect(websocket)
+    return
 
 
 # Monitor API routes

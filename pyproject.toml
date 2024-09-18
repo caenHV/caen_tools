@@ -24,4 +24,5 @@ webservice=[
     "fastapi-utils==0.7.0",
     "uvicorn==0.23.2",
     "typing-inspect==0.9.0",
+    "websockets==13.0.1",
 ]
