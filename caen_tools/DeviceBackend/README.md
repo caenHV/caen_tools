@@ -69,5 +69,5 @@ The microservice for execution of the tickets on the CAEN device.
 | `protocol:str` | conversation protocol of the DeviceBackend | `tcp` |
 | `port:int` | port of the DeviceBackend | `5570` |
 | `address:str` | device backend address for binding | `${protocol}://*:${port}` |
-| `fake_board:bool` | use fake (`true``) or real (`false`) board interface | `true` |
+| `fake_board:bool` | use fake (`true`) or real (`false`) board interface | `true` |
 | `refresh_time:int` | number of seconds to update data on board | `1` |
