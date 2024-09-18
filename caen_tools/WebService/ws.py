@@ -5,7 +5,6 @@ from collections import namedtuple
 
 import os
 import argparse
-import asyncio
 import logging
 
 import uvicorn

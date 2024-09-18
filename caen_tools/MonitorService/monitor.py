@@ -137,10 +137,7 @@ def main():
     address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
     param_file_path = settings.get("monitor", "param_file_path")
-    channel_map_path = settings.get("monitor", "channel_map_path")
     interlock_db_uri = settings.get("monitor", "interlock_db_uri")
-    with open(channel_map_path, encoding="utf-8") as f:
-        channel_map = json.load(f)
     max_interlock_check_delta_time = int(
         settings.get("monitor", "max_interlock_check_delta_time")
     )
@@ -155,7 +152,7 @@ def main():
     )
 
     system_check = SystemCheck(dbpath, interlock_db_uri, max_interlock_check_delta_time)
-    monitor = Monitor(dbpath, system_check, channel_map, param_file_path, interlock_db_uri)
+    monitor = Monitor(dbpath, system_check, param_file_path, interlock_db_uri)
 
     dbs = RouterServer(address, "monitor")
 

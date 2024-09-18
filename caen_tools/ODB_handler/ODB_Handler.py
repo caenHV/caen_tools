@@ -126,7 +126,16 @@ class ODB_Handler:
                     "SELECT channel, voltage, current, t FROM data WHERE (t > ? AND t <= ?) ORDER BY idx DESC",
                     (start, end),
                 ).fetchall()
-                return [dict(row) for row in res]
+                # return [dict(row) for row in res]
+                return [
+                    {
+                        "t": row['t'],
+                        "V": row['voltage'],
+                        "I": row['current'],
+                        "chidx": row['channel'],
+                    }
+                    for row in res
+                ]
             except sqlite3.DatabaseError as e:
                 is_ok = False
                 warnings.warn(f"Houston! We faced problems with the Database: {e}.")
