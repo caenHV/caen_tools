@@ -11,13 +11,11 @@ class Monitor:
         self,
         dbpath: str,
         system_check: SystemCheck,
-        channel_map: dict,
         param_file_path: str,
         interlock_db_uri: str
     ):
         self.__odb = ODB_Handler(dbpath, interlock_db_uri)
         self.__system_check = system_check
-        self.__channel_map: dict = channel_map
         self.__param_file_path = Path(param_file_path)
 
     @staticmethod
@@ -49,12 +47,7 @@ class Monitor:
                 "is_ok" : True for ok and False if something is wrong.
             }
         """
-        res_list = Monitor.__process_response(params, measurement_time)
-        cooked_res_list = [
-            (str(self.__channel_map[chidx]), VMon, IMonH, ts, status)
-            for (chidx, VMon, IMonH, ts, status) in res_list
-            if chidx in self.__channel_map.keys()
-        ]
+        cooked_res_list = Monitor.__process_response(params, measurement_time)
         health_report = self.__system_check.check_params(params["params"])
         is_ok = self.__odb.write_params(cooked_res_list, self.__param_file_path)
         response = {

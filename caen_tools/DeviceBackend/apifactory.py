@@ -74,16 +74,15 @@ class APIMethods:
         logging.debug("Start get params ticket")
         ticket = GetParams_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
-        rawdict = receipt.response.body["params"]
+        if receipt.response.statuscode == 0:
+            return receipt
+
+        rawdata = receipt.response.body["params"]
         outdict = dict()
-        for key in rawdict:
-            keydict = json.loads(key.replace("\\", ""))
-            board = list(keydict["board_info"].keys())[0]
-            conet = keydict["board_info"][board]["conet"]
-            link = keydict["board_info"][board]["link"]
-            chnum = keydict["channel_num"]
-            channel_id = f"{board}_{conet}_{link}_{chnum}"
-            outdict[channel_id] = rawdict[key]
+        for row in rawdata:
+            chidx = row["channel"]["alias"]
+            values = row["params"]
+            outdict[chidx] = values
         receipt.response.body["params"] = outdict
         return receipt
 

@@ -9,18 +9,21 @@ import psycopg2
 
 
 class ODB_Handler:
-    def __init__(self, dbpath: str, interlock_db_uri: str, cleaning_frequency: int = 100):
+    def __init__(
+        self, dbpath: str, interlock_db_uri: str, cleaning_frequency: int = 100
+    ):
         self.__dbpath = dbpath
         parsed_uri = urlparse(interlock_db_uri)
         self.__interlock_db_credentials = {
-                                        'dbname': parsed_uri.hostname,
-                                        'user': parsed_uri.username,
-                                        'password': parsed_uri.password,
-                                        'port': parsed_uri.port,
-                                        'host': parsed_uri.scheme
-                                    }
+            "dbname": parsed_uri.hostname,
+            "user": parsed_uri.username,
+            "password": parsed_uri.password,
+            "port": parsed_uri.port,
+            "host": parsed_uri.scheme,
+        }
 
         self.con = sqlite3.connect(self.__dbpath)
+        self.con.row_factory = sqlite3.Row  # to fetch dicts (not simple tuples)
         self.con.execute(
             "CREATE TABLE IF NOT EXISTS data (idx INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, voltage REAL, current REAL, t INTEGER, status INTEGER);"
         ).close()
@@ -123,14 +126,17 @@ class ODB_Handler:
                     "SELECT channel, voltage, current, t FROM data WHERE (t > ? AND t <= ?) ORDER BY idx DESC",
                     (start, end),
                 ).fetchall()
+                # return [dict(row) for row in res]
+                return [
+                    {
+                        "t": row['t'],
+                        "V": row['voltage'],
+                        "I": row['current'],
+                        "chidx": row['channel'],
+                    }
+                    for row in res
+                ]
             except sqlite3.DatabaseError as e:
                 is_ok = False
                 warnings.warn(f"Houston! We faced problems with the Database: {e}.")
-
-        res_data = []
-        if is_ok:
-            res_data = [
-                {"chidx": chidx, "V": voltage, "I": current, "t": t}
-                for (chidx, voltage, current, t) in res
-            ]
-        return res_data
+        return []
