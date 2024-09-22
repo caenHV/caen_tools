@@ -20,7 +20,7 @@ from caen_tools.connection.client import AsyncClient
 from caen_tools.connection.websockpub import WSPubManager
 from caen_tools.utils.utils import config_processor, get_timestamp, get_logging_config
 from caen_tools.utils.receipt import Receipt
-from caen_tools.WebService.utils import response_provider, send_mail
+from caen_tools.WebService.utils import response_provider, send_mail, send_UDP_to_MChS_Controller
 
 # Initialization part
 # -------------------
@@ -36,6 +36,9 @@ parser.add_argument(
 )
 console_args = parser.parse_args()
 settings = config_processor(console_args.config)
+settings.add_section("global_pars")
+settings.set("global_pars", "last_target_voltage", "0.0")
+settings.set("global_pars", "is_interlock", "True")
 
 get_logging_config(
     level=settings.get("ws", "loglevel"),
@@ -128,10 +131,31 @@ async def system_control() -> None:
     await wspub.broadcast(wspayload) # Broadcast parameters via websocket connection
     dbresp = await setparamsdb(params.response.body["params"])
 
+    MChS_Controller_host = settings.get("ws", "MChs_Controller_host", fallback="127.0.0.1")
+    MChS_Controller_port = settings.get("ws", "MChs_Controller_port", fallback="22")
+    MChS_Controller_client_id = settings.get("ws", "MChs_Controller_client_id", fallback="10")
+           
     if not dbresp.response["body"]["params_ok"]:
         logging.error("Bad device parameters. Emergency DownVoltage")
+        send_UDP_to_MChS_Controller(UDP_IP=MChS_Controller_host, UDP_PORT=MChS_Controller_port, client_id=MChS_Controller_client_id, ack=False)
         await down()
-
+        
+    if dbresp.response["body"]["interlock"]:
+        interlock_voltage_modifier = settings["monitor"].getfloat("interlock_voltage_modifier", 0.4)
+        last_target_voltage = settings["global_pars"].getfloat("last_target_voltage", 0.0)
+        interlock_target_voltage = interlock_voltage_modifier * last_target_voltage
+        
+        settings.set("global_pars", "is_interlock", "True")
+        logging.info("Interlock has been set.")
+        await set_voltage(interlock_target_voltage, from_user=False)
+    
+    is_interlock = settings["global_pars"].getboolean("is_interlock", False)
+    if is_interlock and not dbresp.response["body"]["interlock"]:
+        settings.set("global_pars", "is_interlock", "False")
+        logging.info("Interlock is turned off.")
+        await set_voltage(last_target_voltage, from_user=False)
+    
+    send_UDP_to_MChS_Controller(UDP_IP=MChS_Controller_host, UDP_PORT=MChS_Controller_port, client_id=MChS_Controller_client_id, ack=True)
     return
 
 
@@ -178,7 +202,7 @@ async def read_parameters(sender: str = "webcli") -> Receipt:
 
 @app.post(f"/{Services.DEVBACK.title}/set_voltage", tags=[Services.DEVBACK.title])
 @response_provider
-async def set_voltage(target_voltage: float = Body(embed=True)) -> Receipt:
+async def set_voltage(target_voltage: float = Body(embed=True), from_user: bool = True) -> Receipt:
     """[WS Backend API] Sets voltage on CAEN setup"""
     receipt = Receipt(
         sender="webcli",
@@ -189,6 +213,8 @@ async def set_voltage(target_voltage: float = Body(embed=True)) -> Receipt:
     logging.debug("Start setting voltage %s", target_voltage)
     resp = await cli.query(receipt)
     logging.debug("Voltage set on %s", target_voltage)
+    if from_user:
+        settings.set("global_pars", "last_target_voltage", str(target_voltage))
     return resp
 
 
