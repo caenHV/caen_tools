@@ -20,7 +20,7 @@ from caen_tools.connection.client import AsyncClient
 from caen_tools.connection.websockpub import WSPubManager
 from caen_tools.utils.utils import config_processor, get_timestamp, get_logging_config
 from caen_tools.utils.receipt import Receipt
-from caen_tools.WebService.utils import response_provider, send_mail
+from caen_tools.WebService.utils import response_provider, send_mail, send_UDP_to_MChS_Controller
 
 # Initialization part
 # -------------------
@@ -131,8 +131,13 @@ async def system_control() -> None:
     await wspub.broadcast(wspayload) # Broadcast parameters via websocket connection
     dbresp = await setparamsdb(params.response.body["params"])
 
+    MChS_Controller_host = settings.get("ws", "MChs_Controller_host", fallback="127.0.0.1")
+    MChS_Controller_port = settings.get("ws", "MChs_Controller_port", fallback="22")
+    MChS_Controller_client_id = settings.get("ws", "MChs_Controller_client_id", fallback="10")
+           
     if not dbresp.response["body"]["params_ok"]:
         logging.error("Bad device parameters. Emergency DownVoltage")
+        send_UDP_to_MChS_Controller(UDP_IP=MChS_Controller_host, UDP_PORT=MChS_Controller_port, client_id=MChS_Controller_client_id, ack=False)
         await down()
         
     if dbresp.response["body"]["interlock"]:
@@ -150,6 +155,7 @@ async def system_control() -> None:
         logging.info("Interlock is turned off.")
         await set_voltage(last_target_voltage, from_user=False)
     
+    send_UDP_to_MChS_Controller(UDP_IP=MChS_Controller_host, UDP_PORT=MChS_Controller_port, client_id=MChS_Controller_client_id, ack=True)
     return
 
 
