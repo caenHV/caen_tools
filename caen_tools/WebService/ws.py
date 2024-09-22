@@ -37,7 +37,6 @@ parser.add_argument(
 console_args = parser.parse_args()
 settings = config_processor(console_args.config)
 settings.add_section("global_pars")
-settings.add_section("global_pars")
 settings.set("global_pars", "last_target_voltage", "0.0")
 settings.set("global_pars", "is_interlock", "True")
 
