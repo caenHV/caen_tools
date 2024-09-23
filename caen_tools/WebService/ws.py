@@ -202,7 +202,7 @@ async def set_voltage(
         sender=sender,
         executor=Services.DEVBACK.title,
         title="set_voltage",
-        params={"target_voltage": target_voltage},
+        params={"target_voltage": target_voltage, "from_user": True},
     )
     logging.debug("Start setting voltage %s", target_voltage)
     resp = await cli.query(receipt)

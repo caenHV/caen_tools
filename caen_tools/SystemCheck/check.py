@@ -44,7 +44,6 @@ def main():
             voltage_modifier=settings.getfloat(
                 CONFIG_SECTION, "interlock_voltage_modifier"
             ),
-            target_voltage=0,
             last_interlock_state=None,
         ),
         last_check=get_timestamp(),

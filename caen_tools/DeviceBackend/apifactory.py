@@ -18,7 +18,7 @@ class APIMethods:
     """Contains implementations of the API methods
     of the microservice"""
 
-    TARGET_VOLTAGE = 0
+    USER_TARGET_VOLTAGE = 0  # last value of voltage requested by some user
 
     @staticmethod
     def ticketexec(ticket: Ticket, h: Handler) -> ReceiptResponse:
@@ -63,7 +63,8 @@ class APIMethods:
         logging.debug("Start set_voltage ticket")
         ticket = SetVoltage_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
-        APIMethods.TARGET_VOLTAGE = receipt.params["target_voltage"]
+        if receipt.params.get("from_user", False):
+            APIMethods.USER_TARGET_VOLTAGE = receipt.params["target_voltage"]
         return receipt
 
     @staticmethod
@@ -100,13 +101,13 @@ class APIMethods:
         return receipt
 
     @staticmethod
-    def get_target_voltage(receipt: Receipt, h: Handler) -> Receipt:
-        """Returns current target voltage"""
+    def get_lastuser_voltage(receipt: Receipt, h: Handler) -> Receipt:
+        """Returns last voltage set by user"""
 
-        logging.debug("Start target voltage ticket")
+        logging.debug("Start last user set voltage ticket")
         receipt.response = ReceiptResponse(
             statuscode=1,
-            body={"target_voltage": APIMethods.TARGET_VOLTAGE},
+            body={"last_user_voltage": APIMethods.USER_TARGET_VOLTAGE},
             timestamp=get_timestamp(),
         )
         return receipt
@@ -130,7 +131,7 @@ class APIFactory:
         "set_voltage": APIMethods.set_voltage,
         "params": APIMethods.params,
         "down": APIMethods.down,
-        "target_voltage": APIMethods.get_target_voltage,
+        "last_user_voltage": APIMethods.get_lastuser_voltage,
     }
 
     @staticmethod

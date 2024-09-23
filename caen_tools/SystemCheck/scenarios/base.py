@@ -18,10 +18,10 @@ DOWN_RPT = Receipt(
     params={},
 )
 
-TRGVLT_RPT = Receipt(
+USRVLT_RPT = Receipt(
     sender=SRV_NAME,
     executor="devback",
-    title="target_voltage",
+    title="last_user_voltage",
     params={},
 )
 
@@ -96,19 +96,16 @@ async def base_scenario(cli: AsyncClient, shared_parameters: dict):
             last_interlock_state = interlock
 
         if interlock and not last_interlock_state:
-            trgresp = await cli.query(TRGVLT_RPT)
-            shared_parameters["interlock"]["target_voltage"] = trgresp.response.body[
-                "target_voltage"
-            ]
+            trgresp = await cli.query(USRVLT_RPT)
+            user_voltage = trgresp.response.body["last_user_voltage"]
             voltage_mlt = shared_parameters.get("interlock").get("voltage_modifier")
-            new_target_voltage = (
-                shared_parameters["interlock"]["target_voltage"] * voltage_mlt
-            )
-            logging.info("Interlock has been set. Set voltage %s", new_target_voltage)
-            await cli.query(set_voltage_receipt(new_target_voltage))
+            target_voltage = user_voltage * voltage_mlt
+            logging.info("Interlock has been set. Set voltage %s", target_voltage)
+            await cli.query(set_voltage_receipt(target_voltage))
 
         if not interlock and last_interlock_state:
-            target_voltage = shared_parameters["interlock"]["target_voltage"]
+            trgresp = await cli.query(USRVLT_RPT)
+            target_voltage = trgresp.response.body["last_user_voltage"]
             logging.info("Interlock turned off. Set voltage %s", target_voltage)
             await cli.query(set_voltage_receipt(target_voltage))
 
