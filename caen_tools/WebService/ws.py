@@ -2,6 +2,7 @@
 
 from enum import Enum
 from collections import namedtuple
+from typing import Annotated
 
 import os
 import argparse
@@ -20,7 +21,7 @@ from caen_tools.connection.client import AsyncClient
 from caen_tools.connection.websockpub import WSPubManager
 from caen_tools.utils.utils import config_processor, get_timestamp, get_logging_config
 from caen_tools.utils.receipt import Receipt
-from caen_tools.WebService.utils import response_provider, send_mail, send_UDP_to_MChS_Controller
+from caen_tools.WebService.utils import response_provider, send_mail
 
 # Initialization part
 # -------------------
@@ -67,6 +68,7 @@ class Services(Enum):
 
     DEVBACK = Service("device_backend", settings.get("ws", "device_backend"))
     MONITOR = Service("monitor", settings.get("ws", "monitor"))
+    SYSCHECK = Service("system_check", settings.get("ws", "system_check"))
 
 
 tags_metadata = [
@@ -78,7 +80,13 @@ tags_metadata = [
         "name": Services.MONITOR.title,
         "description": "**Monitor** microservice (Interaction with Databases and SystemCheck)",
     },
+    {
+        "name": Services.SYSCHECK.title,
+        "description": "**System check** (parameter control and interlock following)",
+    },
 ]
+
+INTERLOCK_VAL = settings.get("ws", "interlock_follow")
 
 app = FastAPI(
     title="CAEN Manager App",
@@ -116,46 +124,17 @@ app.add_middleware(
 @repeat_every(seconds=1)
 async def system_control() -> None:
     """The scheduled script for
-    continious system control.
+    continious broadcasting system state.
 
     1. Gets parameters of the system
     2. Broadcast them to subscribers
-    3. Sends them to monitor
-    4. Get system check response
-    5. Down voltage in case of failed check
     """
 
-    logging.info("Start system control script")
-    params = await deviceparams()  # get device parameters
+    SRV_NAME = "broadcaster"
+    logging.info("Broadcasting time")
+    params = await deviceparams(SRV_NAME)  # get device parameters
     wspayload = {"body": params.response.body, "timestamp": params.response.timestamp}
-    await wspub.broadcast(wspayload) # Broadcast parameters via websocket connection
-    dbresp = await setparamsdb(params.response.body["params"])
-
-    MChS_Controller_host = settings.get("ws", "MChs_Controller_host", fallback="127.0.0.1")
-    MChS_Controller_port = settings.get("ws", "MChs_Controller_port", fallback="22")
-    MChS_Controller_client_id = settings.get("ws", "MChs_Controller_client_id", fallback="10")
-           
-    if not dbresp.response["body"]["params_ok"]:
-        logging.error("Bad device parameters. Emergency DownVoltage")
-        send_UDP_to_MChS_Controller(UDP_IP=MChS_Controller_host, UDP_PORT=MChS_Controller_port, client_id=MChS_Controller_client_id, ack=False)
-        await down()
-        
-    if dbresp.response["body"]["interlock"]:
-        interlock_voltage_modifier = settings["monitor"].getfloat("interlock_voltage_modifier", 0.4)
-        last_target_voltage = settings["global_pars"].getfloat("last_target_voltage", 0.0)
-        interlock_target_voltage = interlock_voltage_modifier * last_target_voltage
-        
-        settings.set("global_pars", "is_interlock", "True")
-        logging.info("Interlock has been set.")
-        await set_voltage(interlock_target_voltage, from_user=False)
-    
-    is_interlock = settings["global_pars"].getboolean("is_interlock", False)
-    if is_interlock and not dbresp.response["body"]["interlock"]:
-        settings.set("global_pars", "is_interlock", "False")
-        logging.info("Interlock is turned off.")
-        await set_voltage(last_target_voltage, from_user=False)
-    
-    send_UDP_to_MChS_Controller(UDP_IP=MChS_Controller_host, UDP_PORT=MChS_Controller_port, client_id=MChS_Controller_client_id, ack=True)
+    await wspub.broadcast(wspayload)  # Broadcast parameters via websocket connection
     return
 
 
@@ -188,7 +167,13 @@ async def read_root():
 @app.get(f"/{Services.DEVBACK.title}/status", tags=[Services.DEVBACK.title])
 @response_provider
 async def read_parameters(sender: str = "webcli") -> Receipt:
-    """[WS Backend API] Returns service status information"""
+    """[WS Backend API]
+    Returns `device_backend` status.
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
 
     receipt = Receipt(
         sender=sender,
@@ -202,10 +187,19 @@ async def read_parameters(sender: str = "webcli") -> Receipt:
 
 @app.post(f"/{Services.DEVBACK.title}/set_voltage", tags=[Services.DEVBACK.title])
 @response_provider
-async def set_voltage(target_voltage: float = Body(embed=True), from_user: bool = True) -> Receipt:
-    """[WS Backend API] Sets voltage on CAEN setup"""
+async def set_voltage(
+    target_voltage: Annotated[float, Body()], sender: Annotated[str, Body()] = "webcli"
+) -> Receipt:
+    """[WS Backend API]
+    Sets voltage on CAEN setup
+
+    Parameters
+    ----------
+    - **target_voltage**: float value of the voltage to be set
+    - **sender**: string identifier of the request sender
+    """
     receipt = Receipt(
-        sender="webcli",
+        sender=sender,
         executor=Services.DEVBACK.title,
         title="set_voltage",
         params={"target_voltage": target_voltage},
@@ -213,17 +207,21 @@ async def set_voltage(target_voltage: float = Body(embed=True), from_user: bool 
     logging.debug("Start setting voltage %s", target_voltage)
     resp = await cli.query(receipt)
     logging.debug("Voltage set on %s", target_voltage)
-    if from_user:
-        settings.set("global_pars", "last_target_voltage", str(target_voltage))
     return resp
 
 
 @app.post(f"/{Services.DEVBACK.title}/down", tags=[Services.DEVBACK.title])
 @response_provider
-async def down() -> Receipt:
-    """[WS Backend API] Turns off voltage from CAEN setup"""
+async def down(sender: Annotated[str, Body(embed=True)] = "webcli") -> Receipt:
+    """[WS Backend API]
+    Turns off voltage from CAEN setup
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
     receipt = Receipt(
-        sender="webcli",
+        sender=sender,
         executor=Services.DEVBACK.title,
         title="down",
         params={},
@@ -234,10 +232,18 @@ async def down() -> Receipt:
 
 @app.get(f"/{Services.DEVBACK.title}/params", tags=[Services.DEVBACK.title])
 @response_provider
-async def deviceparams():
-    """[WS Backend API] Gets parameters of CAEN setup"""
+async def deviceparams(
+    sender: Annotated[str, Query(max_length=50)] = "webcli"
+) -> Receipt:
+    """[WS Backend API]
+    Gets parameters of CAEN setup
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
     receipt = Receipt(
-        sender="webcli",
+        sender=sender,
         executor=Services.DEVBACK.title,
         title="params",
         params={},
@@ -264,10 +270,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get(f"/{Services.MONITOR.title}/status", tags=[Services.MONITOR.title])
 @response_provider
-async def monstatus() -> Receipt:
-    """[WS Backend API] Returns a status of the Monitor service"""
+async def monstatus(sender: Annotated[str, Query(max_length=50)] = "webcli") -> Receipt:
+    """[WS Backend API]
+    Returns a status of the Monitor service
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
     receipt_in = Receipt(
-        sender="webcli",
+        sender=sender,
         executor=Services.MONITOR.title,
         title="status",
         params={},
@@ -279,13 +291,22 @@ async def monstatus() -> Receipt:
 @app.get(f"/{Services.MONITOR.title}/getparams", tags=[Services.MONITOR.title])
 @response_provider
 async def paramsdb(
-    start_timestamp: int = Query(),
-    stop_timestamp: int | None = Query(default=None),
+    start_timestamp: Annotated[int, Query()],
+    stop_timestamp: Annotated[int | None, Query()] = None,
+    sender: Annotated[str, Query(max_length=50)] = "webcli",
 ) -> Receipt:
-    """[WS Backend API] Returns parameters from the Monitor microservice"""
+    """[WS Backend API]
+    Returns parameters from the `monitor` microservice
+
+    Parameters
+    ----------
+    - **start_timestamp**: start timestamp for data retrieval (in seconds)
+    - **stop_timestamp**: stop timestamp for data retrieval  (in seconds)
+    - **sender**: string identifier of the request sender
+    """
     stop_timestamp = get_timestamp() if stop_timestamp is None else stop_timestamp
     receipt = Receipt(
-        sender="webcli",
+        sender=sender,
         executor=Services.MONITOR.title,
         title="get_params",
         params=dict(
@@ -300,14 +321,100 @@ async def paramsdb(
 @app.post(f"/{Services.MONITOR.title}/setparams", tags=[Services.MONITOR.title])
 @response_provider
 async def setparamsdb(
-    params: dict[str, dict[str, float]] = Body(embed=True)
+    params: Annotated[dict[str, dict[str, float]], Body(embed=True)],
+    sender: Annotated[str, Query(max_length=50)] = "webcli",
 ) -> Receipt:
-    """[WS Backend API] Sends input parameters into Monitor"""
+    """[WS Backend API]
+    Sends input parameters into `monitor`
+
+    Parameters
+    ----------
+    - **params**: dictionary of the parameters to be set in monitor
+    - **sender**: string identifier of the request sender
+    """
+
     receipt = Receipt(
-        sender="webcli",
+        sender=sender,
         executor=Services.MONITOR.title,
         title="send_params",
         params={"params": params},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+# System check API routes
+
+
+@app.get(f"/{Services.SYSCHECK.title}/last_check", tags=[Services.SYSCHECK.title])
+async def last_check(
+    sender: Annotated[str, Query(max_length=50)] = "webcli"
+) -> Receipt:
+    """[WS Backend API]
+    Gets a timestamp of the last check performed
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
+
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.SYSCHECK.title,
+        title="last_check",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+@app.get(
+    f"/{Services.SYSCHECK.title}/is_interlock_follow", tags=[Services.SYSCHECK.title]
+)
+@response_provider
+async def is_interlock_follow(
+    sender: Annotated[str, Query(max_length=50)] = "webcli"
+) -> Receipt:
+    """[WS Backend API]
+    Gets a state of the interlock following
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
+
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.SYSCHECK.title,
+        title="follow_ilock",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+@app.post(
+    f"/{Services.SYSCHECK.title}/set_interlock_follow", tags=[Services.SYSCHECK.title]
+)
+@response_provider
+async def set_interlock_follow(
+    value: Annotated[bool, Body()],
+    sender: Annotated[str, Body(max_length=50)] = "webcli",
+) -> Receipt:
+    """[WS Backend API]
+    Sets a state of the interlock following
+
+    Parameters
+    ----------
+    - **value**: bool value to be set
+    - **sender**: string identifier of the request sender
+    """
+
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.SYSCHECK.title,
+        title="set_follow_ilock",
+        params={"value": value},
     )
     resp = await cli.query(receipt)
     return resp
@@ -322,6 +429,7 @@ def main():
         port=settings.getint("ws", "port"),
         host=settings.get("ws", "host"),
         log_config=None,
+        # workers=1,
     )
 
 

@@ -11,11 +11,14 @@ from caen_setup.Tickets.Tickets import (
 )
 
 from caen_tools.utils.receipt import Receipt, ReceiptResponse
+from caen_tools.utils.utils import get_timestamp
 
 
 class APIMethods:
     """Contains implementations of the API methods
     of the microservice"""
+
+    TARGET_VOLTAGE = 0
 
     @staticmethod
     def ticketexec(ticket: Ticket, h: Handler) -> ReceiptResponse:
@@ -60,6 +63,7 @@ class APIMethods:
         logging.debug("Start set_voltage ticket")
         ticket = SetVoltage_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
+        APIMethods.TARGET_VOLTAGE = receipt.params["target_voltage"]
         return receipt
 
     @staticmethod
@@ -96,6 +100,18 @@ class APIMethods:
         return receipt
 
     @staticmethod
+    def get_target_voltage(receipt: Receipt, h: Handler) -> Receipt:
+        """Returns current target voltage"""
+
+        logging.debug("Start target voltage ticket")
+        receipt.response = ReceiptResponse(
+            statuscode=1,
+            body={"target_voltage": APIMethods.TARGET_VOLTAGE},
+            timestamp=get_timestamp(),
+        )
+        return receipt
+
+    @staticmethod
     def wrongroute(receipt: Receipt) -> Receipt:
         """Default answer for the wrong title field in the receipt"""
 
@@ -114,6 +130,7 @@ class APIFactory:
         "set_voltage": APIMethods.set_voltage,
         "params": APIMethods.params,
         "down": APIMethods.down,
+        "target_voltage": APIMethods.get_target_voltage,
     }
 
     @staticmethod

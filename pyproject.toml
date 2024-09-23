@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name="caen-tools"
-version="2.0"
+version="2.1"
 requires-python=">=3.11"
 dependencies=[
     "pyzmq==25.1.1",
@@ -16,6 +16,7 @@ dependencies=[
 caen_device_backend = "caen_tools.DeviceBackend.main:main"
 caen_monitor = "caen_tools.MonitorService.monitor:main"
 caen_webserver = "caen_tools.WebService.ws:main"
+caen_system_check = "caen_tools.SystemCheck.check:main"
 
 [project.optional-dependencies]
 webservice=[
@@ -25,4 +26,5 @@ webservice=[
     "uvicorn==0.23.2",
     "typing-inspect==0.9.0",
     "websockets==13.0.1",
+    "sse-starlette==2.1.3",
 ]

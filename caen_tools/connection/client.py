@@ -38,12 +38,12 @@ class AsyncClient(BaseClient):
     connect_addr: Dict[str, str]
         map of connection addresses in format {"identity" : "address"}
         (e.g. {"device_backend", "tcp://localhost:5000"})
-    receive_time: int | None
+    receive_time: int, default 20
         waiting time for server answer (in seconds)
     """
 
     def __init__(
-        self, connect_addresses: Dict[str, str], receive_time: int | None = None
+        self, connect_addresses: Dict[str, str], receive_time: int  = 20
     ):
         logging.debug("Start AsyncCli initialization")
         context = zmq.asyncio.Context()
