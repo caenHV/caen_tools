@@ -1,7 +1,7 @@
 """Defines the Receipt and ReceiptResponse
 (microservices communicate using these objects)"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Union
 
 import json

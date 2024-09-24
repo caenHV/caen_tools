@@ -15,7 +15,9 @@ def response_provider(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
         resp = await func(*args, **kwargs)
-        if isinstance(resp.response, ReceiptResponseError):
+        if isinstance(resp.response, ReceiptResponseError) or (
+            resp.response.statuscode > 300
+        ):
             data = resp.response
             raise HTTPException(status_code=data.statuscode, detail=data.body)
         return resp

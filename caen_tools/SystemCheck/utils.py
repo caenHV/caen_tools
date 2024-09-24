@@ -58,7 +58,7 @@ def send_udp_to_mchs_controller(udp_ip: str, udp_port: str, client_id: str, ack:
         sock.sendto(
             str.encode(f"{'ACK' if ack else 'NACK'} {client_id}"), (udp_ip, udp_port)
         )
-        logging.info(
+        logging.debug(
             "Sent UDP package to MChS Controller with status code %s",
             ("ACK" if ack else "NACK"),
         )

@@ -185,6 +185,27 @@ async def read_parameters(sender: str = "webcli") -> Receipt:
     return resp
 
 
+@app.get(f"/{Services.DEVBACK.title}/user_permissions", tags=[Services.DEVBACK.title])
+@response_provider
+async def get_user_permission(sender: str = "webcli") -> Receipt:
+    """[WS Backend API]
+    Returns user permissions for setting voltaget.
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
+
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.DEVBACK.title,
+        title="get_user_permission",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
 @app.post(f"/{Services.DEVBACK.title}/set_voltage", tags=[Services.DEVBACK.title])
 @response_provider
 async def set_voltage(

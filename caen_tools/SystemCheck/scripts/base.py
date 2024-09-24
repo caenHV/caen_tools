@@ -36,6 +36,7 @@ def set_voltage_receipt(target_voltage: float) -> Receipt:
     )
 
 
+
 @check_process(1)
 async def base_scenario(cli: AsyncClient, shared_parameters: dict):
     """Main system check scenario

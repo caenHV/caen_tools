@@ -3,21 +3,33 @@
 import asyncio
 import logging
 
-from caen_tools.connection.client import AsyncClient
-from caen_tools.SystemCheck.scenarios import base_scenario
+from caen_tools.SystemCheck.scripts import (
+    HealthParameters,
+    ManagerScript,
+    InterlockControl,
+)
 
 
-def run_worker(shared_parameters: dict, devback_address: str, mon_address: str):
+def run_worker(
+    shared_parameters: dict,
+    devback_address: str,
+    mon_address: str,
+    interlock_db_uri: str,
+):
     """Worker running different scenarios for system control"""
 
     logging.info("Start worker %s, %s", devback_address, mon_address)
 
-    cli = AsyncClient({"devback": devback_address, "monitor": mon_address}, 10)
+    interlock = InterlockControl(
+        shared_parameters["interlock"], devback_address, interlock_db_uri
+    )
+    health = HealthParameters(
+        shared_parameters["health"], devback_address, mon_address, [interlock]
+    )
+    manager = ManagerScript([interlock, health])
 
-    loop = asyncio.get_event_loop()
-
-    # Add all using scenarios in the loop
-    loop.create_task(base_scenario(cli, shared_parameters))
+    # Start manager and included scenarios
+    loop = manager.start()
 
     try:
         loop.run_forever()

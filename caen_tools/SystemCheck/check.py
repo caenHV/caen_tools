@@ -7,7 +7,7 @@ import multiprocessing as mp
 
 from caen_tools.SystemCheck.server import run_server
 from caen_tools.SystemCheck.worker import run_worker
-from caen_tools.utils.utils import config_processor, get_logging_config, get_timestamp
+from caen_tools.utils.utils import config_processor, get_logging_config
 
 CONFIG_SECTION = "check"
 
@@ -37,23 +37,30 @@ def main():
         "Start SysCheck with arguments %s", dict(settings.items(CONFIG_SECTION))
     )
 
+    mchs_dict = dict(
+        udp_ip=settings.get(CONFIG_SECTION, "mchs_host"),
+        udp_port=settings.get(CONFIG_SECTION, "mchs_port"),
+        client_id=settings.get(CONFIG_SECTION, "mchs_client_id"),
+    )
+
     manager = mp.Manager()
     shared_parameters = manager.dict(
         interlock=manager.dict(
-            follow=settings.getboolean(CONFIG_SECTION, "interlock_follow"),
+            enable=settings.getboolean(CONFIG_SECTION, "interlock_follow"),
+            repeat_every=60,
+            last_check=0,
             voltage_modifier=settings.getfloat(
                 CONFIG_SECTION, "interlock_voltage_modifier"
             ),
-            last_interlock_state=None,
+            mchs=mchs_dict,
         ),
-        last_check=get_timestamp(),
-        mchs=manager.dict(
-            host=settings.get(CONFIG_SECTION, "mchs_host"),
-            port=settings.get(CONFIG_SECTION, "mchs_port"),
-            id=settings.get(CONFIG_SECTION, "mchs_client_id"),
+        health=manager.dict(
+            enable=True,
+            repeat_every=1,
+            last_check=0,
+            mchs=mchs_dict,
         ),
     )
-    # shared_state = manager.dict()
 
     worker = mp.Process(
         target=run_worker,
@@ -61,6 +68,7 @@ def main():
             shared_parameters,
             settings.get(CONFIG_SECTION, "device_backend"),
             settings.get(CONFIG_SECTION, "monitor"),
+            settings.get(CONFIG_SECTION, "interlock_db_uri"),
         ),
     )
     serv = mp.Process(

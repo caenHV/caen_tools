@@ -13,9 +13,11 @@ class APIMethods:
         """Gets last check timestamp"""
         logging.debug("Start last check method")
 
+        last_check_timestamp = shared_parameters['health']['last_check']
+        
         receipt.response = ReceiptResponse(
             statuscode=1,
-            body=dict(last_check=shared_parameters.get("last_check")),
+            body=dict(last_check=last_check_timestamp),
             timestamp=get_timestamp(),
         )
         return receipt
@@ -30,7 +32,7 @@ class APIMethods:
         receipt.response = ReceiptResponse(
             statuscode=1,
             body=dict(
-                interlock_follow=shared_parameters.get("interlock").get("follow")
+                interlock_follow=shared_parameters.get("interlock").get("enable")
             ),
             timestamp=get_timestamp(),
         )
@@ -43,12 +45,12 @@ class APIMethods:
         """Sets new state of interlock follow"""
 
         logging.info("Set interlock_follow to %s", receipt.params)
-        shared_parameters["interlock"]["follow"] = bool(receipt.params["value"])
-        logging.info("new par %s", shared_parameters["interlock"]["follow"])
+        shared_parameters["interlock"]["enable"] = bool(receipt.params["value"])
+        logging.info("new par %s", shared_parameters["interlock"]["enable"])
         receipt.response = ReceiptResponse(
             statuscode=1,
             body=dict(
-                interlock_follow=shared_parameters.get("interlock").get("follow")
+                interlock_follow=shared_parameters.get("interlock").get("enable")
             ),
             timestamp=get_timestamp(),
         )

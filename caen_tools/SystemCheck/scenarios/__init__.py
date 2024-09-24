@@ -1,1 +1,0 @@
-from caen_tools.SystemCheck.scenarios.base import base_scenario

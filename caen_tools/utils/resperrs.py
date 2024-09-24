@@ -15,3 +15,10 @@ class RResponseErrors:
     def GatewayTimeout(msg: str = "Server error: Gateway Timeout") -> ReceiptResponse:
         """Response when waiting time exeeded (for example)"""
         return ReceiptResponseError(statuscode=503, body=msg)
+
+    @staticmethod
+    def ForbiddenMethod(
+        msg: str = "Usage of the method is prohibited",
+    ) -> ReceiptResponse:
+        """Response when usage of the some API method is forbidden"""
+        return ReceiptResponseError(statuscode=403, body=msg)
