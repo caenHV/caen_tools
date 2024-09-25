@@ -8,7 +8,7 @@ version="2.1"
 requires-python=">=3.11"
 dependencies=[
     "pyzmq==25.1.1",
-    "caen-setup @ git+https://github.com/caenHV/Setup.git@v1.1.1",
+    "caen-setup @ git+https://github.com/caenHV/Setup.git@v1.1.1-fix",
     "psycopg2-binary==2.9.9",
 ]
 
