@@ -6,3 +6,4 @@ venv/
 *.db
 *build*
 dist
+*.sh
