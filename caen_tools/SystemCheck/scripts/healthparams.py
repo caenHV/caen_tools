@@ -2,9 +2,10 @@ import logging
 import timeit
 
 from caen_tools.connection.client import AsyncClient
-from caen_tools.SystemCheck.scripts.metascript import Script
 from caen_tools.utils.utils import get_timestamp
-from caen_tools.SystemCheck.utils import send_udp_to_mchs_controller
+from caen_tools.utils.receipt import ReceiptResponseError
+
+from .metascript import Script
 from .stuctures import HealthParametersDict
 from .receipts import PreparedReceipts, Services
 from .mchswork import MChSWorker
@@ -36,16 +37,24 @@ class HealthParameters(Script):
         self.mchs = mchs
 
     async def exec_function(self):
+        logging.debug("Start HealthParameters script")
         starttime = timeit.default_timer()
 
         # Read current state of CAEN
         devpars = await self.cli.query(PreparedReceipts.get_params(self.SENDER))
+        if isinstance(devpars.response, ReceiptResponseError):
+            logging.error("No connection with DevBackend during HealthCheck")
+            return
+
         self.logger.debug("Devpars %s", devpars)
 
         # Put these parameters into monitor
         moncheck = await self.cli.query(
             PreparedReceipts.put2mon(self.SENDER, devpars.response.body["params"])
         )
+        if isinstance(moncheck.response, ReceiptResponseError):
+            logging.error("No connection with Monitor during HealthCheck")
+            return
 
         # Monitor provides status of uploaded data (ok or not ok)
         paramsok = moncheck.response.body["params_ok"]
@@ -70,5 +79,5 @@ class HealthParameters(Script):
         self.mchs.send_state()
 
         exectime = timeit.default_timer() - starttime
-        self.logger.info("HealthParameters was done in %.3f s", exectime)
+        self.logger.info("HealthParameters were done in %.3f s", exectime)
         return

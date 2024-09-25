@@ -157,7 +157,7 @@ async def read_root():
     """Redirect on frontend page"""
     return FileResponse(os.path.join(root, "frontend", "build", "index.html"))
 
-@app.get("/energy-icon.svg")
+@app.get("/energy-icon.svg", include_in_schema=False)
 async def read_favicon():
     """Reads favicon for the webpage"""
     return FileResponse(os.path.join(root, "frontend", "build", "energy-icon.svg"))
