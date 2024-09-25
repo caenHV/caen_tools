@@ -5,44 +5,17 @@ import psycopg2
 
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.utils import get_timestamp
-from caen_tools.utils.receipt import Receipt
-from caen_tools.SystemCheck.utils import send_udp_to_mchs_controller
 from .metascript import Script
 from .stuctures import InterlockState, InterlockParamsDict
+from .receipts import PreparedReceipts, Services
 
 
 class InterlockControl(Script):
     """Main class for the continious interlock control"""
 
+    logger = logging.getLogger("InterlockControl class")
+
     SENDER = "syscheck/ilockcontrol"
-    DEVBACK = "devback"
-
-    @staticmethod
-    def rpt_usr_vlt() -> Receipt:
-        return Receipt(
-            sender=InterlockControl.SENDER,
-            executor=InterlockControl.DEVBACK,
-            title="last_user_voltage",
-            params={},
-        )
-
-    @staticmethod
-    def rpt_set_vlt(target_voltage: float) -> Receipt:
-        return Receipt(
-            sender=InterlockControl.SENDER,
-            executor=InterlockControl.DEVBACK,
-            title="set_voltage",
-            params={"target_voltage": target_voltage},
-        )
-
-    @staticmethod
-    def rpt_set_user_perm(enable_user_set: bool) -> Receipt:
-        return Receipt(
-            sender=InterlockControl.SENDER,
-            executor=InterlockControl.DEVBACK,
-            title="set_user_permission",
-            params={"enable_user_set": enable_user_set},
-        )
 
     def __init__(
         self,
@@ -50,9 +23,9 @@ class InterlockControl(Script):
         devback_address: str,
         interlock_db_uri: str,
     ):
-        logging.info("Init InterlockControl script")
-        super().__init__(shared_parameters=shared_parameters, dependent_scripts=[])
-        self.cli = AsyncClient({InterlockControl.DEVBACK: devback_address})
+        self.logger.info("Init InterlockControl script")
+        super().__init__(shared_parameters=shared_parameters)
+        self.cli = AsyncClient({Services.DEVBACK: devback_address})
         self.__interlock_db_uri = interlock_db_uri
         self.conn = self.__connect_database()
         self.last_interlock = InterlockState()
@@ -67,10 +40,10 @@ class InterlockControl(Script):
             "port": parsed_uri.port,
         }
         try:
-            logging.info(credentials)
+            self.logger.info(credentials)
             con = psycopg2.connect(**credentials)
         except psycopg2.OperationalError as e:
-            logging.warning("Not connected to SND database: %s", e)
+            self.logger.warning("Not connected to SND database: %s", e)
             con = None
 
         return con
@@ -92,7 +65,7 @@ class InterlockControl(Script):
                 res = cursor.fetchone()
                 interlock_state = InterlockState(bool(res[0]))
         except Exception as e:
-            logging.error(
+            self.logger.error(
                 "Houston! We faced problems with getting interlock from the SND Database: %s",
                 e,
             )
@@ -100,50 +73,53 @@ class InterlockControl(Script):
         return interlock_state
 
     async def on_start(self) -> None:
-        await self.cli.query(InterlockControl.rpt_set_user_perm(False))
+        self.logger.info("Start interlock control. Disable user to set voltage")
+        await self.cli.query(PreparedReceipts.set_user_permission(self.SENDER, False))
 
     async def on_stop(self) -> None:
-        await self.cli.query(InterlockControl.rpt_set_user_perm(True))
+        self.logger.info("Stop interlock control. Enable user to set voltage")
+        await self.cli.query(PreparedReceipts.set_user_permission(self.SENDER, True))
 
     async def exec_function(self):
         """Main execution script for InterlockControl"""
 
-        logging.info("Start interlock scipt")
-
+        self.logger.info("Start interlock scipt")
         interlock = self.interlock
-
         if interlock == self.last_interlock:
+            logging.debug("No change in interlock")
             return
 
         new_ilock, old_iloc = interlock.current_state, self.last_interlock.current_state
 
         if new_ilock is True and old_iloc is False:
-            trgresp = await self.cli.query(self.rpt_usr_vlt())
+            trgresp = await self.cli.query(
+                PreparedReceipts.last_user_voltage(self.SENDER)
+            )
             user_voltage = trgresp.response.body["last_user_voltage"]
             voltage_mlt = self.shared_parameters.get("voltage_modifier")
             target_voltage = user_voltage * voltage_mlt
-            logging.info("Interlock has been set. Set voltage %.3f", target_voltage)
-            send_udp_to_mchs_controller(
-                **self.shared_parameters["mchs"],
-                ack=False,
+            self.logger.info("Interlock has been set. Set voltage %.3f", target_voltage)
+
+            await self.cli.query(
+                PreparedReceipts.set_voltage(self.SENDER, target_voltage)
             )
-            await self.cli.query(self.rpt_set_vlt(target_voltage))
 
         elif new_ilock is False and old_iloc is True:
-            trgresp = await self.cli.query(self.rpt_usr_vlt())
+            trgresp = await self.cli.query(
+                PreparedReceipts.last_user_voltage(self.SENDER)
+            )
             target_voltage = trgresp.response.body["last_user_voltage"]
-            logging.info(
+            self.logger.info(
                 "Interlock has been turned off. Set voltage %.3f", target_voltage
             )
-            send_udp_to_mchs_controller(
-                **self.shared_parameters["mchs"],
-                ack=True,
+
+            await self.cli.query(
+                PreparedReceipts.set_voltage(self.SENDER, target_voltage)
             )
-            await self.cli.query(self.rpt_set_vlt(target_voltage))
 
         self.last_interlock = interlock
         self.shared_parameters["last_check"] = get_timestamp()
-        logging.debug("Interlock check was completed")
+        self.logger.debug("Interlock check was completed")
         return
 
     def __del__(self):

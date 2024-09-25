@@ -52,14 +52,13 @@ def main():
             voltage_modifier=settings.getfloat(
                 CONFIG_SECTION, "interlock_voltage_modifier"
             ),
-            mchs=mchs_dict,
         ),
         health=manager.dict(
             enable=True,
             repeat_every=1,
             last_check=0,
-            mchs=mchs_dict,
         ),
+        mchs=mchs_dict,
     )
 
     worker = mp.Process(

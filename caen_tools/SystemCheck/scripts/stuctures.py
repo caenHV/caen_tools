@@ -31,7 +31,6 @@ class InterlockParamsDict(TypedDict):
     repeat_every: int
     voltage_modifier: float
     last_check: int
-    mchs: MCHSDict
 
 
 class HealthParametersDict(TypedDict):
@@ -40,4 +39,3 @@ class HealthParametersDict(TypedDict):
     enable: bool
     repeat_every: int
     last_check: int
-    mchs: MCHSDict

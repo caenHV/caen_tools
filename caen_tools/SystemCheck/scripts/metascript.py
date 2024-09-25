@@ -14,48 +14,41 @@ class SharedParamsDict(TypedDict):
 
 
 class Script(ABC):
+    logger = logging.getLogger("MetaScript class")
 
-    def __init__(
-        self,
-        shared_parameters: SharedParamsDict,
-        dependent_scripts: list["Script"] | None = None,
-    ):
+    def __init__(self, shared_parameters: SharedParamsDict):
         self.task = None
         self.shared_parameters = shared_parameters
-        self.dependent_scripts = (
-            dependent_scripts if dependent_scripts is not None else []
-        )
+
+    @property
+    def isrunning(self) -> bool:
+        """Running script or not"""
+        return self.task is not None
 
     def start_ifnot(self) -> None:
         """Starts a scenario loop if it not running yet"""
 
         self.shared_parameters["enable"] = True
 
-        if self.task is not None:
-            logging.warning("Scenario is already started")
+        if self.isrunning:
+            self.logger.warning("Scenario is already started")
             return
 
         asyncio.create_task(self.on_start())
         self.task = asyncio.create_task(self.loop())
-        logging.info("Start scenario")
+        self.logger.info("Start scenario")
         return
 
     def stop(self) -> None:
         """Stops a scenario loop"""
+        if not self.isrunning:
+            self.logger.debug("Script is already stopped. No need stop")
+            return
+
         self.shared_parameters["enable"] = False
         self.task = None
         asyncio.create_task(self.on_stop())
-        logging.info("Stop scenario")
-        return
-
-    def stop_deps(self) -> None:
-        """Stops all dependent scripts"""
-
-        logging.warning("Call stop all dependents for the script")
-        for dep_script in self.dependent_scripts:
-            dep_script.stop_all()
-            dep_script.stop()
-
+        self.logger.warning("Stop the script")
         return
 
     def trigger(self) -> None:
@@ -89,9 +82,9 @@ class Script(ABC):
             exectime = timeit.default_timer() - starttime
             repeat_every = self.shared_parameters["repeat_every"]
             await asyncio.sleep(max(0, repeat_every - exectime))
-            logging.debug("scenario exec function is completed")
+            self.logger.debug("scenario exec function is completed")
         except asyncio.CancelledError:
-            logging.info("Task was cancelled")
+            self.logger.info("Task was cancelled")
             return False
 
         if self.shared_parameters["enable"] is True:
