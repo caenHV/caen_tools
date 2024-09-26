@@ -5,6 +5,7 @@ from collections import namedtuple
 from typing import Annotated
 
 import os
+import asyncio
 import argparse
 import logging
 
@@ -97,7 +98,6 @@ cli = AsyncClient(
     {s.title: s.address for s in Services},
     settings.get("ws", "receive_time"),
 )
-# wspub = WSPubManager()
 
 root = os.path.dirname(os.path.abspath(__file__))
 app.mount(
@@ -115,28 +115,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Schedulers part
-# ---------------
-
-
-# @app.on_event("startup")
-# @repeat_every(seconds=1)
-# async def system_control() -> None:
-#     """The scheduled script for
-#     continious broadcasting system state.
-
-#     1. Gets parameters of the system
-#     2. Broadcast them to subscribers
-#     """
-
-#     SRV_NAME = "broadcaster"
-#     logging.info("Broadcasting time")
-#     params = await deviceparams(SRV_NAME)  # get device parameters
-#     wspayload = {"body": params.response.body, "timestamp": params.response.timestamp}
-#     await wspub.broadcast(wspayload)  # Broadcast parameters via websocket connection
-#     return
-
 
 @app.on_event("shutdown")
 async def last_scream() -> None:
@@ -171,7 +149,7 @@ async def read_favicon():
 
 
 @alru_cache(ttl=1)
-async def devback_status(sender: str = "webcli") -> Receipt:
+async def devback_status(sender: str = "webcli", receive_time: float | None = None) -> Receipt:
     """Returns a status of DeviceBackend
     (cache during 1 s)
     """
@@ -181,7 +159,7 @@ async def devback_status(sender: str = "webcli") -> Receipt:
         title="status",
         params={},
     )
-    resp = await cli.query(receipt)
+    resp = await cli.query(receipt, receive_time)
     return resp
 
 
@@ -198,21 +176,6 @@ async def read_parameters(sender: str = "webcli") -> Receipt:
 
     response = await devback_status(sender)
     return response
-
-
-@app.get(f"/{Services.DEVBACK.title}/status_broadcast", tags=[Services.DEVBACK.title])
-async def devback_status_broadcast(sender: str = "webcli") -> EventSourceResponse:
-    """Broadcaster of the device backend status
-
-    Parameters
-    ----------
-    - **sender**: string identifier of the request sender
-    """
-
-    return EventSourceResponse(
-        broadcaster(1, devback_status, sender=sender), send_timeout=5
-    )
-
 
 @app.get(f"/{Services.DEVBACK.title}/user_permissions", tags=[Services.DEVBACK.title])
 @response_provider
@@ -317,22 +280,22 @@ async def device_params_api(
     return response
 
 
-@app.get(f"/{Services.DEVBACK.title}/params_broadcast", tags=[Services.DEVBACK.title])
-async def device_params_broadcast(sender: str = "webcli") -> EventSourceResponse:
-    """Broadcaster of the device backend parameters
-
-    Parameters
-    ----------
-    - **sender**: string identifier of the request sender
-    """
-
-    delay = 1  # in seconds
-    return EventSourceResponse(
-        broadcaster(delay, device_params, sender=sender), send_timeout=5
-    )
-
-
 # Monitor API routes
+
+
+@alru_cache(ttl=1)
+async def monitor_status(sender: str = "webcli", receive_time: float | None = None) -> Receipt:
+    """Returns a status of Monitor
+    (cache during 1 s)
+    """
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.MONITOR.title,
+        title="status",
+        params={},
+    )
+    response = await cli.query(receipt, receive_time)
+    return response
 
 
 @app.get(f"/{Services.MONITOR.title}/status", tags=[Services.MONITOR.title])
@@ -345,14 +308,8 @@ async def monstatus(sender: Annotated[str, Query(max_length=50)] = "webcli") -> 
     ----------
     - **sender**: string identifier of the request sender
     """
-    receipt_in = Receipt(
-        sender=sender,
-        executor=Services.MONITOR.title,
-        title="status",
-        params={},
-    )
-    receipt_out = await cli.query(receipt_in)
-    return receipt_out
+    response = await monitor_status(sender)
+    return response
 
 
 @app.get(f"/{Services.MONITOR.title}/getparams", tags=[Services.MONITOR.title])
@@ -413,6 +370,22 @@ async def setparamsdb(
 # System check API routes
 
 
+
+@alru_cache(ttl=1)
+async def syscheck_status(sender: str = "webcli", receive_time: float | None = None) -> Receipt:
+    """Returns a status of System Check
+    (cache during 1 s)
+    """
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.SYSCHECK.title,
+        title="last_check",
+        params={},
+    )
+    response = await cli.query(receipt, receive_time)
+    return response
+
+
 @app.get(f"/{Services.SYSCHECK.title}/last_check", tags=[Services.SYSCHECK.title])
 async def last_check(
     sender: Annotated[str, Query(max_length=50)] = "webcli"
@@ -424,14 +397,8 @@ async def last_check(
     ----------
     - **sender**: string identifier of the request sender
     """
-
-    receipt = Receipt(
-        sender=sender,
-        executor=Services.SYSCHECK.title,
-        title="last_check",
-        params={},
-    )
-    resp = await cli.query(receipt)
+    
+    resp = await syscheck_status(sender)
     return resp
 
 
@@ -485,6 +452,47 @@ async def set_interlock_follow(
     )
     resp = await cli.query(receipt)
     return resp
+
+# Events stream
+
+@app.get("/events/status", tags=["events"])
+async def devback_status_broadcast() -> EventSourceResponse:
+    """Broadcaster of the all system status
+
+    Do not use different **senders** to acheive boost from cache functions
+    """
+
+    async def get_status(sender: str, rcv_time: float):
+        async with asyncio.TaskGroup() as tg:
+            devback = tg.create_task(devback_status(sender, rcv_time))
+            monitor = tg.create_task(monitor_status(sender, rcv_time))
+            syscheck = tg.create_task(syscheck_status(sender, rcv_time))
+
+        response = {
+            Services.DEVBACK.title: devback.result().response,
+            Services.MONITOR.title: monitor.result().response,
+            Services.SYSCHECK.title: syscheck.result().response,
+        }
+        return response
+
+    return EventSourceResponse(
+        broadcaster(1, get_status, sender="eventstream", rcv_time=1), send_timeout=5
+    )
+
+
+
+@app.get(f"/{Services.DEVBACK.title}/params_broadcast", tags=[Services.DEVBACK.title])
+async def device_params_broadcast() -> EventSourceResponse:
+    """Broadcaster of the device backend parameters
+    
+    Do not use sender to acheive the boost from cache function
+    """
+
+    delay = 1  # in seconds
+    return EventSourceResponse(
+        broadcaster(delay, device_params, sender="eventstream"), send_timeout=5
+    )
+
 
 
 def main():
