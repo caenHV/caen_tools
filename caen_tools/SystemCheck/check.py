@@ -52,6 +52,7 @@ def main():
             voltage_modifier=settings.getfloat(
                 CONFIG_SECTION, "interlock_voltage_modifier"
             ),
+            target_voltage=0,
         ),
         health=manager.dict(
             enable=True,

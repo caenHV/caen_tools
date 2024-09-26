@@ -27,6 +27,7 @@ class InterlockControl(Script):
         self.__intrlck_manager = InterlockManager(interlock_db_uri)
         self.last_interlock = InterlockState()
         self.__is_locked = False
+        self.__target_voltage = self.shared_parameters.get("target_voltage", 0)
 
     @property
     def interlock(self) -> InterlockState:
@@ -54,23 +55,19 @@ class InterlockControl(Script):
         new_ilock = interlock.current_state
 
         if new_ilock is True and self.__is_locked is False:
-            trgresp = await self.cli.query(
-                PreparedReceipts.last_user_voltage(self.SENDER)
+            target_voltage = self.__target_voltage
+            voltage_mlt: float = self.shared_parameters.get("voltage_modifier", 0)
+            ilock_target_voltage = target_voltage * voltage_mlt
+            self.logger.info(
+                "Interlock has been set. Set voltage %.3f", ilock_target_voltage
             )
-            user_voltage = trgresp.response.body["last_user_voltage"]
-            voltage_mlt = self.shared_parameters.get("voltage_modifier")
-            target_voltage = user_voltage * voltage_mlt
-            self.logger.info("Interlock has been set. Set voltage %.3f", target_voltage)
             self.__is_locked = True
             await self.cli.query(
-                PreparedReceipts.set_voltage(self.SENDER, target_voltage)
+                PreparedReceipts.set_voltage(self.SENDER, ilock_target_voltage)
             )
 
         elif new_ilock is False and self.__is_locked is True:
-            trgresp = await self.cli.query(
-                PreparedReceipts.last_user_voltage(self.SENDER)
-            )
-            target_voltage = trgresp.response.body["last_user_voltage"]
+            target_voltage = self.__target_voltage
             self.logger.info(
                 "Interlock has been turned off. Set voltage %.3f", target_voltage
             )

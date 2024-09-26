@@ -1,7 +1,7 @@
 import logging
 from urllib.parse import urlparse
 import psycopg2
-from .structures import InterlockState, InterlockParamsDict
+from .structures import InterlockState
 
 
 class InterlockManager:

@@ -157,10 +157,12 @@ async def read_root():
     """Redirect on frontend page"""
     return FileResponse(os.path.join(root, "frontend", "build", "index.html"))
 
+
 @app.get("/energy-icon.svg", include_in_schema=False)
 async def read_favicon():
     """Reads favicon for the webpage"""
     return FileResponse(os.path.join(root, "frontend", "build", "energy-icon.svg"))
+
 
 # API part
 # --------
@@ -424,6 +426,7 @@ async def is_interlock_follow(
 @response_provider
 async def set_interlock_follow(
     value: Annotated[bool, Body()],
+    target_voltage: Annotated[float, Body()],
     sender: Annotated[str, Body(max_length=50)] = "webcli",
 ) -> Receipt:
     """[WS Backend API]
@@ -439,7 +442,7 @@ async def set_interlock_follow(
         sender=sender,
         executor=Services.SYSCHECK.title,
         title="set_follow_ilock",
-        params={"value": value},
+        params={"value": value, "target_voltage": target_voltage},
     )
     resp = await cli.query(receipt)
     return resp
