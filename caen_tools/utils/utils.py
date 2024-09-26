@@ -5,6 +5,9 @@ from pathlib import Path
 import configparser
 import time
 import logging
+from logging.config import dictConfig
+from datetime import datetime
+from pytz import timezone
 
 
 def root_project() -> Path:
@@ -39,23 +42,62 @@ def get_timestamp() -> int:
 
 
 def get_logging_config(
-    filepath: Path | None = None, console_output: bool = True, level=logging.INFO
+    filepath: Path | None = None,
+    console_output: bool = True,
+    level=logging.INFO,
+    backup_count: int = 15,
 ) -> None:
-    """Sets logging.baseConfig"""
+    """Configure logging.
+
+    Parameters
+    ----------
+    filepath : Path | None, optional
+        Path to the actual file, by default None
+        On rotating it also sets the filename suffix. Rotating happens every midnight.
+    console_output : bool, optional
+        Mirror logging info to the stream, by default True
+    level : _type_, optional
+        _description_, by default logging.INFO
+    backup_count : int, optional
+        If backupCount is nonzero, at most backupCount files will be kept,
+        and if more would be created when rollover occurs,
+        the oldest one is deleted. By default backup_count = 15.
+    """
     handlers = []
     if console_output:
-        handlers.append(logging.StreamHandler())
+        handlers.append("stream")
     if (filepath is not None) and not (filepath == ""):
-        handlers.append(logging.FileHandler(filepath))
+        handlers.append("default")
     if isinstance(level, str):
         level = logging.getLevelName(level.upper())
 
-    logging.basicConfig(
-        handlers=handlers,
-        level=level,
-        encoding="utf-8",
-        format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y/%m/%d %H:%M:%S",
-    )
+    # Sets timezone of timestamps in the log file to Novosibirsk Time.
+    tz = timezone("Asia/Novosibirsk")
+    logging.Formatter.converter = lambda *args: datetime.now(tz).timetuple()
+    LOGGING_CONFIG = {
+        "version": 1,
+        "formatters": {
+            "default": {
+                "format": "[%(asctime)s] %(levelname)s in %(filename)s line %(lineno)d: %(message)s",
+                "datefmt": "%Y-%m-$d %H:%M:%S UTC+7",
+            }
+        },
+        "handlers": {
+            "default": {
+                "class": "logging.handlers.TimedRotatingFileHandler",
+                "formatter": "default",
+                "filename": filepath,
+                "when": "midnight",
+                "encoding": "utf-8",
+                "backupCount": backup_count,
+            },
+            "stream": {
+                "class": "logging.handlers.StreamHandler",
+                "formatter": "default",
+            },
+        },
+        "root": {"level": level, "handlers": handlers},
+    }
+    dictConfig(LOGGING_CONFIG)
     logging.debug("Set logging settings")
     return
