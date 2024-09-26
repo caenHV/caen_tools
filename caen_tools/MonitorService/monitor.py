@@ -151,8 +151,7 @@ def main():
         dict(settings.items("monitor")),
     )
 
-    system_check = SystemCheck(dbpath, interlock_db_uri, max_interlock_check_delta_time)
-    monitor = Monitor(dbpath, system_check, param_file_path, interlock_db_uri)
+    monitor = Monitor(dbpath, param_file_path)
 
     dbs = RouterServer(address, "monitor")
 

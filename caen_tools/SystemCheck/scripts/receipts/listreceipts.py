@@ -12,18 +12,6 @@ class Services:
 class PreparedReceipts:
 
     @staticmethod
-    def last_user_voltage(sender: str) -> Receipt:
-        """Gets last voltage given by a user on the device"""
-
-        logging.debug("Ask for receipt last_user_voltage")
-        return Receipt(
-            sender=sender,
-            executor=Services.DEVBACK,
-            title="last_user_voltage",
-            params={},
-        )
-
-    @staticmethod
     def set_voltage(sender: str, target_voltage: float) -> Receipt:
         """Sets voltage on device"""
 

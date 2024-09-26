@@ -36,6 +36,34 @@ class HealthParameters(Script):
         self.dependent_scripts = stop_on_failure if stop_on_failure is not None else []
         self.mchs = mchs
 
+    @staticmethod
+    def __check_ch_status(pars: dict) -> bool:
+        status = False
+        try:
+            ch_status_list = [
+                int(bin(int(val["ChStatus"]))[2:]) > 111 for _, val in pars.items()
+            ]
+            status = not any(ch_status_list)
+        except Exception as e:
+            logging.warning("Can't check channels status. %s", e)
+        logging.info("Channels status is %s", "good" if status else "bad")
+        return status
+
+    @staticmethod
+    def __check_currents(pars: dict, max_currents: dict) -> bool:
+        # TODO: Implement.
+        status = False
+        logging.info("Channels currents are %s", "good" if status else "bad")
+        return True
+
+    @staticmethod
+    def are_parameters_ok(pars: dict) -> bool:
+        params_ok = HealthParameters.__check_ch_status(
+            pars
+        ) and HealthParameters.__check_currents(pars, dict())
+
+        return params_ok
+
     async def exec_function(self):
         logging.debug("Start HealthParameters script")
         starttime = timeit.default_timer()
@@ -48,16 +76,8 @@ class HealthParameters(Script):
 
         self.logger.debug("Devpars %s", devpars)
 
-        # Put these parameters into monitor
-        moncheck = await self.cli.query(
-            PreparedReceipts.put2mon(self.SENDER, devpars.response.body["params"])
-        )
-        if isinstance(moncheck.response, ReceiptResponseError):
-            logging.error("No connection with Monitor during HealthCheck")
-            return
-
         # Monitor provides status of uploaded data (ok or not ok)
-        paramsok = moncheck.response.body["params_ok"]
+        paramsok = HealthParameters.are_parameters_ok(devpars.response.body["params"])
         self.shared_parameters["last_check"] = get_timestamp()
 
         if not paramsok:
@@ -77,6 +97,14 @@ class HealthParameters(Script):
         # Send good news on mchs
         self.mchs.set_state(health_params=True)
         self.mchs.send_state()
+
+        # Put parameters into monitor
+        moncheck = await self.cli.query(
+            PreparedReceipts.put2mon(self.SENDER, devpars.response.body["params"])
+        )
+        if isinstance(moncheck.response, ReceiptResponseError):
+            logging.error("No connection with Monitor during HealthCheck")
+            return
 
         exectime = timeit.default_timer() - starttime
         self.logger.info("HealthParameters were done in %.3f s", exectime)
