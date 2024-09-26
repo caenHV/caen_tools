@@ -9,15 +9,18 @@ class APIMethods:
     """A set of API methods of SystemCheck"""
 
     @staticmethod
-    def last_check(receipt: Receipt, shared_parameters: dict, **kwargs) -> Receipt:
-        """Gets last check timestamp"""
-        logging.debug("Start last check method")
+    def status(receipt: Receipt, shared_parameters: dict, **kwargs) -> Receipt:
+        """Gets status of the SysCheck"""
+        logging.debug("Start status method")
 
         last_check_timestamp = shared_parameters['health']['last_check']
         
         receipt.response = ReceiptResponse(
             statuscode=1,
-            body=dict(last_check=last_check_timestamp),
+            body=dict(
+                health = shared_parameters["health"],
+                autopilot = shared_parameters["interlock"],
+            ),
             timestamp=get_timestamp(),
         )
         return receipt

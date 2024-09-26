@@ -379,15 +379,15 @@ async def syscheck_status(sender: str = "webcli", receive_time: float | None = N
     receipt = Receipt(
         sender=sender,
         executor=Services.SYSCHECK.title,
-        title="last_check",
+        title="status",
         params={},
     )
     response = await cli.query(receipt, receive_time)
     return response
 
 
-@app.get(f"/{Services.SYSCHECK.title}/last_check", tags=[Services.SYSCHECK.title])
-async def last_check(
+@app.get(f"/{Services.SYSCHECK.title}/status", tags=[Services.SYSCHECK.title])
+async def status_api(
     sender: Annotated[str, Query(max_length=50)] = "webcli"
 ) -> Receipt:
     """[WS Backend API]

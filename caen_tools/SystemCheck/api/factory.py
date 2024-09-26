@@ -6,7 +6,7 @@ class APIFactory:
     """Executes input receipt"""
 
     apiroutes = {
-        "last_check": APIMethods.last_check,
+        "status": APIMethods.status,
         "follow_ilock": APIMethods.is_interlock_follow,
         "set_follow_ilock": APIMethods.set_ilock_follow,
     }
