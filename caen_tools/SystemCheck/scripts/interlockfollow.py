@@ -1,13 +1,11 @@
-from urllib.parse import urlparse
 import logging
-
-import psycopg2
 
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.utils import get_timestamp
 from .metascript import Script
 from .stuctures import InterlockState, InterlockParamsDict
 from .receipts import PreparedReceipts, Services
+from .interlock_manager import InterlockManager
 
 
 class InterlockControl(Script):
@@ -26,50 +24,13 @@ class InterlockControl(Script):
         self.logger.info("Init InterlockControl script")
         super().__init__(shared_parameters=shared_parameters)
         self.cli = AsyncClient({Services.DEVBACK: devback_address})
-        self.__interlock_db_uri = interlock_db_uri
-        self.conn = self.__connect_database()
+        self.__intrlck_manager = InterlockManager(interlock_db_uri)
         self.last_interlock = InterlockState()
-
-    def __connect_database(self):
-        parsed_uri = urlparse(self.__interlock_db_uri)
-        credentials = {
-            "dbname": parsed_uri.path[1:],
-            "user": parsed_uri.username,
-            "password": parsed_uri.password,
-            "host": parsed_uri.hostname,
-            "port": parsed_uri.port,
-        }
-        try:
-            self.logger.info(credentials)
-            con = psycopg2.connect(**credentials)
-        except psycopg2.OperationalError as e:
-            self.logger.warning("Not connected to SND database: %s", e)
-            con = None
-
-        return con
 
     @property
     def interlock(self) -> InterlockState:
         """Returns last value of interlock state"""
-
-        interlock_state = self.last_interlock
-
-        if self.conn is None:
-            self.conn = self.__connect_database()
-
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT value, time from values where property = 'KMD_Interlock';"
-                )
-                res = cursor.fetchone()
-                interlock_state = InterlockState(bool(res[0]))
-        except Exception as e:
-            self.logger.error(
-                "Houston! We faced problems with getting interlock from the SND Database: %s",
-                e,
-            )
-
+        interlock_state = self.__intrlck_manager.get_interlock
         return interlock_state
 
     async def on_start(self) -> None:
@@ -123,7 +84,5 @@ class InterlockControl(Script):
         return
 
     def __del__(self):
-        if self.conn is not None:
-            self.conn.close()
         del self.cli
         return
