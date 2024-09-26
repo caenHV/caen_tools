@@ -15,13 +15,13 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from fastapi_utils.tasks import repeat_every
+from async_lru import alru_cache
+from sse_starlette.sse import EventSourceResponse
 
 from caen_tools.connection.client import AsyncClient
-from caen_tools.connection.websockpub import WSPubManager
 from caen_tools.utils.utils import config_processor, get_timestamp, get_logging_config
 from caen_tools.utils.receipt import Receipt
-from caen_tools.WebService.utils import response_provider, send_mail
+from caen_tools.WebService.utils import response_provider, send_mail, broadcaster
 
 # Initialization part
 # -------------------
@@ -97,7 +97,7 @@ cli = AsyncClient(
     {s.title: s.address for s in Services},
     settings.get("ws", "receive_time"),
 )
-wspub = WSPubManager()
+# wspub = WSPubManager()
 
 root = os.path.dirname(os.path.abspath(__file__))
 app.mount(
@@ -120,22 +120,22 @@ app.add_middleware(
 # ---------------
 
 
-@app.on_event("startup")
-@repeat_every(seconds=1)
-async def system_control() -> None:
-    """The scheduled script for
-    continious broadcasting system state.
+# @app.on_event("startup")
+# @repeat_every(seconds=1)
+# async def system_control() -> None:
+#     """The scheduled script for
+#     continious broadcasting system state.
 
-    1. Gets parameters of the system
-    2. Broadcast them to subscribers
-    """
+#     1. Gets parameters of the system
+#     2. Broadcast them to subscribers
+#     """
 
-    SRV_NAME = "broadcaster"
-    logging.info("Broadcasting time")
-    params = await deviceparams(SRV_NAME)  # get device parameters
-    wspayload = {"body": params.response.body, "timestamp": params.response.timestamp}
-    await wspub.broadcast(wspayload)  # Broadcast parameters via websocket connection
-    return
+#     SRV_NAME = "broadcaster"
+#     logging.info("Broadcasting time")
+#     params = await deviceparams(SRV_NAME)  # get device parameters
+#     wspayload = {"body": params.response.body, "timestamp": params.response.timestamp}
+#     await wspub.broadcast(wspayload)  # Broadcast parameters via websocket connection
+#     return
 
 
 @app.on_event("shutdown")
@@ -157,15 +157,32 @@ async def read_root():
     """Redirect on frontend page"""
     return FileResponse(os.path.join(root, "frontend", "build", "index.html"))
 
+
 @app.get("/energy-icon.svg", include_in_schema=False)
 async def read_favicon():
     """Reads favicon for the webpage"""
     return FileResponse(os.path.join(root, "frontend", "build", "energy-icon.svg"))
 
+
 # API part
 # --------
 
 # Device backend API routes
+
+
+@alru_cache(ttl=1)
+async def devback_status(sender: str = "webcli") -> Receipt:
+    """Returns a status of DeviceBackend
+    (cache during 1 s)
+    """
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.DEVBACK.title,
+        title="status",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp
 
 
 @app.get(f"/{Services.DEVBACK.title}/status", tags=[Services.DEVBACK.title])
@@ -179,14 +196,22 @@ async def read_parameters(sender: str = "webcli") -> Receipt:
     - **sender**: string identifier of the request sender
     """
 
-    receipt = Receipt(
-        sender=sender,
-        executor=Services.DEVBACK.title,
-        title="status",
-        params={},
+    response = await devback_status(sender)
+    return response
+
+
+@app.get(f"/{Services.DEVBACK.title}/status_broadcast", tags=[Services.DEVBACK.title])
+async def devback_status_broadcast(sender: str = "webcli") -> EventSourceResponse:
+    """Broadcaster of the device backend status
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
+
+    return EventSourceResponse(
+        broadcaster(1, devback_status, sender=sender), send_timeout=5
     )
-    resp = await cli.query(receipt)
-    return resp
 
 
 @app.get(f"/{Services.DEVBACK.title}/user_permissions", tags=[Services.DEVBACK.title])
@@ -255,9 +280,29 @@ async def down(sender: Annotated[str, Body(embed=True)] = "webcli") -> Receipt:
     return resp
 
 
+@alru_cache(ttl=1)
+async def device_params(sender: str = "webcli") -> Receipt:
+    """[WS Backend API]
+    Gets parameters of CAEN setup
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
+
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.DEVBACK.title,
+        title="params",
+        params={},
+    )
+    response = await cli.query(receipt)
+    return response
+
+
 @app.get(f"/{Services.DEVBACK.title}/params", tags=[Services.DEVBACK.title])
 @response_provider
-async def deviceparams(
+async def device_params_api(
     sender: Annotated[str, Query(max_length=50)] = "webcli"
 ) -> Receipt:
     """[WS Backend API]
@@ -267,27 +312,24 @@ async def deviceparams(
     ----------
     - **sender**: string identifier of the request sender
     """
-    receipt = Receipt(
-        sender=sender,
-        executor=Services.DEVBACK.title,
-        title="params",
-        params={},
+
+    response = await device_params(sender)
+    return response
+
+
+@app.get(f"/{Services.DEVBACK.title}/params_broadcast", tags=[Services.DEVBACK.title])
+async def device_params_broadcast(sender: str = "webcli") -> EventSourceResponse:
+    """Broadcaster of the device backend parameters
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
+
+    delay = 1  # in seconds
+    return EventSourceResponse(
+        broadcaster(delay, device_params, sender=sender), send_timeout=5
     )
-    resp = await cli.query(receipt)
-    return resp
-
-
-@app.websocket(f"/{Services.DEVBACK.title}/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """[WS Backend API] Websocket endpoint
-    to get CAEN setup parameters every second"""
-    await wspub.connect(websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        wspub.disconnect(websocket)
-    return
 
 
 # Monitor API routes

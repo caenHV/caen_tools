@@ -1,11 +1,14 @@
 from functools import wraps
 from typing import List
 
+import asyncio
+import json
 import logging
 import subprocess
 
 from fastapi import HTTPException
 from caen_tools.utils.receipt import ReceiptResponseError
+from caen_tools.utils.receipt import ReceiptJSONEncoder
 
 
 def response_provider(func):
@@ -56,3 +59,21 @@ def send_mail(addresses: List[str], subject: str, text: str) -> int:
     )
     logging.debug("Sent mail with status code %s", return_stat)
     return 1
+
+
+def broadcaster(delay, function, *args, **kwargs):
+    """Creates a generator to broadcast `function`
+    function responses every delay (in seconds) in the loop"""
+
+    async def generator():
+        """yields response strings"""
+        try:
+            while True:
+                response = await function(*args, **kwargs)
+                response_str = json.dumps(response, cls=ReceiptJSONEncoder)
+                yield response_str
+                await asyncio.sleep(delay)
+        except asyncio.CancelledError:
+            logging.info("Disconnected from client (via refresh/close)")
+
+    return generator()
