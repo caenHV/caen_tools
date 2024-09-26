@@ -51,7 +51,7 @@ class AsyncClient(BaseClient):
         self.connect_addresses = connect_addresses
         super().__init__(context, int(receive_time))
 
-    async def query(self, receipt: Receipt) -> Receipt:
+    async def query(self, receipt: Receipt, receive_time: float | None = None) -> Receipt:
         """Query and response
 
         Parameters
@@ -62,6 +62,9 @@ class AsyncClient(BaseClient):
 
             the field "executor" in the Receipt
             must correspond to the key from the connect_addresses
+
+        receive_time : float | None, None
+             waiting answer time for the response from the client (in seconds)
 
         Returns
         -------
@@ -79,6 +82,9 @@ class AsyncClient(BaseClient):
         receipt_str = json.dumps(receipt, cls=ReceiptJSONEncoder).encode("utf-8")
         s = self.context.socket(zmq.DEALER)
         connect_address = self.connect_addresses[receipt.executor]
+        
+        if receive_time is not None:
+            s.setsockopt(zmq.RCVTIMEO, receive_time * 1000)
 
         with s.connect(connect_address) as sock:
             await sock.send_multipart([b"", receipt_str])
