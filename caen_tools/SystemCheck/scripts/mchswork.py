@@ -48,7 +48,7 @@ class MChSWorker:
         return
 
     def __init__(self, udp_ip: str, udp_port: str, client_id: str):
-        self.udp_ip = (udp_ip,)
+        self.udp_ip = udp_ip
         self.udp_port = udp_port
         self.client_id = client_id
         self.__state = dict(health_params=None, interlock=None)
@@ -57,7 +57,7 @@ class MChSWorker:
     def isack(self) -> bool:
         """Checks the total acknowledge"""
         logging.debug("Get total ack from mchs worker")
-        return all([ack for ack in self.__state.values()])
+        return all(self.__state.values())
 
     def set_state(self, **kwargs):
         """Sets an acknowledge"""

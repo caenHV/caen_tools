@@ -6,7 +6,7 @@ from caen_tools.utils.utils import get_timestamp
 from caen_tools.utils.receipt import ReceiptResponseError
 
 from .metascript import Script
-from .stuctures import HealthParametersDict
+from .structures import HealthParametersDict
 from .receipts import PreparedReceipts, Services
 from .mchswork import MChSWorker
 

@@ -3,7 +3,7 @@ import logging
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.utils import get_timestamp
 from .metascript import Script
-from .stuctures import InterlockState, InterlockParamsDict
+from .structures import InterlockState, InterlockParamsDict
 from .receipts import PreparedReceipts, Services
 from .interlock_manager import InterlockManager
 
@@ -26,6 +26,7 @@ class InterlockControl(Script):
         self.cli = AsyncClient({Services.DEVBACK: devback_address})
         self.__intrlck_manager = InterlockManager(interlock_db_uri)
         self.last_interlock = InterlockState()
+        self.__is_locked = False
 
     @property
     def interlock(self) -> InterlockState:
@@ -50,9 +51,9 @@ class InterlockControl(Script):
             logging.debug("No change in interlock")
             return
 
-        new_ilock, old_iloc = interlock.current_state, self.last_interlock.current_state
+        new_ilock = interlock.current_state
 
-        if new_ilock is True and old_iloc is False:
+        if new_ilock is True and self.__is_locked is False:
             trgresp = await self.cli.query(
                 PreparedReceipts.last_user_voltage(self.SENDER)
             )
@@ -60,12 +61,12 @@ class InterlockControl(Script):
             voltage_mlt = self.shared_parameters.get("voltage_modifier")
             target_voltage = user_voltage * voltage_mlt
             self.logger.info("Interlock has been set. Set voltage %.3f", target_voltage)
-
+            self.__is_locked = True
             await self.cli.query(
                 PreparedReceipts.set_voltage(self.SENDER, target_voltage)
             )
 
-        elif new_ilock is False and old_iloc is True:
+        elif new_ilock is False and self.__is_locked is True:
             trgresp = await self.cli.query(
                 PreparedReceipts.last_user_voltage(self.SENDER)
             )
@@ -73,7 +74,7 @@ class InterlockControl(Script):
             self.logger.info(
                 "Interlock has been turned off. Set voltage %.3f", target_voltage
             )
-
+            self.__is_locked = False
             await self.cli.query(
                 PreparedReceipts.set_voltage(self.SENDER, target_voltage)
             )
