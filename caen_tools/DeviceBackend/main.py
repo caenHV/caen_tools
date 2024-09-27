@@ -58,6 +58,9 @@ def main():
         level=settings.get("device", "loglevel"),
         filepath=settings.get("device", "logfile"),
     )
+    ramp_up_speed = settings.getint("device", "ramp_up_speed", fallback=20)
+    ramp_down_speed = settings.getint("device", "ramp_down_speed", fallback=100)
+    is_high_range = settings.getboolean("device", "is_high_Imon_range", fallback=True)
     logging.info(
         "Successfuly started DeviceBackend with arguments %s",
         dict(settings.items("device")),
@@ -65,7 +68,12 @@ def main():
 
     dbs = RouterServer(address, "devback")
     handler = Handler(
-        map_config, refresh_time=handler_refresh_time, fake_board=fake_board
+        map_config,
+        refresh_time=handler_refresh_time,
+        fake_board=fake_board,
+        ramp_up=ramp_up_speed,
+        ramp_down=ramp_down_speed,
+        is_high_range=is_high_range,
     )
 
     loop = asyncio.get_event_loop()

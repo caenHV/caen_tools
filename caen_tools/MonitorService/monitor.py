@@ -2,11 +2,9 @@
 
 import argparse
 import asyncio
-import json
 import logging
 
 from caen_tools.connection.server import RouterServer
-from caen_tools.MonitorService.SystemCheck import SystemCheck
 from caen_tools.MonitorService.monclass import Monitor
 from caen_tools.utils.receipt import Receipt, ReceiptResponse
 from caen_tools.utils.utils import config_processor, get_logging_config
@@ -61,7 +59,7 @@ class APIMethods:
         )
         receipt.response = ReceiptResponse(
             statuscode=1 if response["is_ok"] else 0,
-            body=response["system_health_report"],
+            body={},
         )
         return receipt
 
@@ -137,10 +135,6 @@ def main():
     address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
     param_file_path = settings.get("monitor", "param_file_path")
-    interlock_db_uri = settings.get("monitor", "interlock_db_uri")
-    max_interlock_check_delta_time = int(
-        settings.get("monitor", "max_interlock_check_delta_time")
-    )
 
     get_logging_config(
         level=settings.get("monitor", "loglevel"),
@@ -151,8 +145,7 @@ def main():
         dict(settings.items("monitor")),
     )
 
-    system_check = SystemCheck(dbpath, interlock_db_uri, max_interlock_check_delta_time)
-    monitor = Monitor(dbpath, system_check, param_file_path, interlock_db_uri)
+    monitor = Monitor(dbpath, param_file_path)
 
     dbs = RouterServer(address, "monitor")
 

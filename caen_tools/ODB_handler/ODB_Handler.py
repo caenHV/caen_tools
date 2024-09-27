@@ -3,24 +3,11 @@ import json
 from pathlib import Path
 import sqlite3
 import warnings
-from urllib.parse import urlparse
-
-import psycopg2
 
 
 class ODB_Handler:
-    def __init__(
-        self, dbpath: str, interlock_db_uri: str, cleaning_frequency: int = 100
-    ):
+    def __init__(self, dbpath: str, cleaning_frequency: int = 100):
         self.__dbpath = dbpath
-        parsed_uri = urlparse(interlock_db_uri)
-        self.__interlock_db_credentials = {
-            "dbname": parsed_uri.hostname,
-            "user": parsed_uri.username,
-            "password": parsed_uri.password,
-            "port": parsed_uri.port,
-            "host": parsed_uri.scheme,
-        }
 
         self.con = sqlite3.connect(self.__dbpath)
         self.con.row_factory = sqlite3.Row  # to fetch dicts (not simple tuples)
@@ -30,36 +17,14 @@ class ODB_Handler:
         self.__records_after_delete_counter: int = 0
         self.__cleaning_frequency: int = cleaning_frequency
 
-    def get_interlock(self):
-        is_ok = True
-        res = None
-        try:
-            conn = psycopg2.connect(**self.__interlock_db_credentials)
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT value, time from values where property = 'KMD_Interlock';"
-                )
-                res = cursor.fetchone()
-
-        except Exception as e:
-            is_ok = False
-            warnings.warn(
-                f"Houston! We faced problems with getting interlock from the SND Database: {e}."
-            )
-        if is_ok or res is None or len(res) != 1:
-            return {"state": 1, "time": int(datetime.now().timestamp())}
-
-        res_data = {"state": int(res[0]), "time": int(res[1].timestamp())}
-        return res_data
-
     def __write_param_file(self, results: list, param_file_path: Path):
         tmp_path = param_file_path.with_name(param_file_path.name + "_tmp")
         cooked = {}
-        for channel, voltage, current, t, status in results:
+        for channel, voltage, current, _, _ in results:
             cooked["DCV" + channel] = voltage
             cooked["DCC" + channel] = current
 
-        with open(tmp_path, mode="w") as f:
+        with open(tmp_path, mode="w", encoding="utf-8") as f:
             json.dump(cooked, f)
         tmp_path.rename(param_file_path)
 
@@ -129,10 +94,10 @@ class ODB_Handler:
                 # return [dict(row) for row in res]
                 return [
                     {
-                        "t": row['t'],
-                        "V": row['voltage'],
-                        "I": row['current'],
-                        "chidx": row['channel'],
+                        "t": row["t"],
+                        "V": row["voltage"],
+                        "I": row["current"],
+                        "chidx": row["channel"],
                     }
                     for row in res
                 ]

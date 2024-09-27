@@ -1,4 +1,4 @@
 from .manager import ManagerScript
 from .healthparams import HealthParameters
-from .interlockfollow import InterlockControl
+from .autopilot import AutopilotControl
 from .mchswork import MChSWorker

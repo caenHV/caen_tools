@@ -12,7 +12,6 @@ from caen_setup.Tickets.Tickets import (
 
 from caen_tools.utils.receipt import Receipt, ReceiptResponse
 from caen_tools.utils.resperrs import RResponseErrors
-from caen_tools.utils.utils import get_timestamp
 
 
 class APIMethods:
@@ -113,16 +112,6 @@ class APIMethods:
         return receipt
 
     @staticmethod
-    def get_lastuser_voltage(receipt: Receipt, h: Handler) -> Receipt:
-        """Returns last voltage set by user"""
-
-        logging.debug("Start last user set voltage ticket")
-        receipt.response = ReceiptResponse(
-            statuscode=1, body={"last_user_voltage": APIMethods.USER_TARGET_VOLTAGE}
-        )
-        return receipt
-
-    @staticmethod
     def get_user_permission(receipt: Receipt, h: Handler) -> Receipt:
         """Sets permission of the user to use set_voltage"""
 
@@ -162,7 +151,6 @@ class APIFactory:
         "set_voltage": APIMethods.set_voltage,
         "params": APIMethods.params,
         "down": APIMethods.down,
-        "last_user_voltage": APIMethods.get_lastuser_voltage,
         "get_user_permission": APIMethods.get_user_permission,
         "set_user_permission": APIMethods.set_user_permission,
     }

@@ -24,13 +24,14 @@ class MCHSDict(TypedDict):
     client_id: str
 
 
-class InterlockParamsDict(TypedDict):
-    """Defines shared parameters dict structure for InterlockControl script"""
+class AutopilotParamsDict(TypedDict):
+    """Defines shared parameters dict structure for AutopilotControl script"""
 
     enable: bool
     repeat_every: int
     voltage_modifier: float
     last_check: int
+    target_voltage: float
 
 
 class HealthParametersDict(TypedDict):

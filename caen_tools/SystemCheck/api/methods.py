@@ -13,8 +13,8 @@ class APIMethods:
         """Gets status of the SysCheck"""
         logging.debug("Start status method")
 
-        last_check_timestamp = shared_parameters['health']['last_check']
-        
+        last_check_timestamp = shared_parameters["health"]["last_check"]
+
         receipt.response = ReceiptResponse(
             statuscode=1,
             body=dict(
@@ -50,10 +50,15 @@ class APIMethods:
         logging.info("Set interlock_follow to %s", receipt.params)
         shared_parameters["interlock"]["enable"] = bool(receipt.params["value"])
         logging.info("new par %s", shared_parameters["interlock"]["enable"])
+        shared_parameters["interlock"]["target_voltage"] = float(
+            receipt.params["target_voltage"]
+        )
+        logging.info("new par %s", shared_parameters["interlock"]["enable"])
         receipt.response = ReceiptResponse(
             statuscode=1,
             body=dict(
-                interlock_follow=shared_parameters.get("interlock").get("enable")
+                interlock_follow=shared_parameters.get("interlock").get("enable"),
+                target_voltage=shared_parameters.get("interlock").get("target_voltage"),
             ),
             timestamp=get_timestamp(),
         )

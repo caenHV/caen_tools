@@ -420,7 +420,7 @@ async def is_interlock_follow(
     receipt = Receipt(
         sender=sender,
         executor=Services.SYSCHECK.title,
-        title="follow_ilock",
+        title="status_autopilot",
         params={},
     )
     resp = await cli.query(receipt)
@@ -433,6 +433,7 @@ async def is_interlock_follow(
 @response_provider
 async def set_interlock_follow(
     value: Annotated[bool, Body()],
+    target_voltage: Annotated[float, Body()],
     sender: Annotated[str, Body(max_length=50)] = "webcli",
 ) -> Receipt:
     """[WS Backend API]
@@ -441,14 +442,15 @@ async def set_interlock_follow(
     Parameters
     ----------
     - **value**: bool value to be set
+    - **target_voltage**: a voltage multiplier to be maintained
     - **sender**: string identifier of the request sender
     """
 
     receipt = Receipt(
         sender=sender,
         executor=Services.SYSCHECK.title,
-        title="set_follow_ilock",
-        params={"value": value},
+        title="set_autopilot",
+        params={"value": value, "target_voltage": target_voltage},
     )
     resp = await cli.query(receipt)
     return resp

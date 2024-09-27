@@ -6,7 +6,7 @@ import logging
 from caen_tools.SystemCheck.scripts import (
     HealthParameters,
     ManagerScript,
-    InterlockControl,
+    AutopilotControl,
     MChSWorker,
 )
 
@@ -22,7 +22,7 @@ def run_worker(
     logging.info("Start worker %s, %s", devback_address, mon_address)
 
     mchs = MChSWorker(**shared_parameters["mchs"])
-    interlock = InterlockControl(
+    interlock = AutopilotControl(
         shared_parameters["interlock"], devback_address, interlock_db_uri
     )
     health = HealthParameters(

@@ -2,7 +2,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from caen_tools.MonitorService.SystemCheck import SystemCheck
 from caen_tools.ODB_handler.ODB_Handler import ODB_Handler
 
 
@@ -10,12 +9,9 @@ class Monitor:
     def __init__(
         self,
         dbpath: str,
-        system_check: SystemCheck,
         param_file_path: str,
-        interlock_db_uri: str
     ):
-        self.__odb = ODB_Handler(dbpath, interlock_db_uri)
-        self.__system_check = system_check
+        self.__odb = ODB_Handler(dbpath)
         self.__param_file_path = Path(param_file_path)
 
     @staticmethod
@@ -48,12 +44,10 @@ class Monitor:
             }
         """
         cooked_res_list = Monitor.__process_response(params, measurement_time)
-        health_report = self.__system_check.check_params(params["params"])
         is_ok = self.__odb.write_params(cooked_res_list, self.__param_file_path)
         response = {
             "timestamp": int(datetime.now().timestamp()),
             "is_ok": is_ok,
-            "system_health_report": health_report,
         }
         return response
 
@@ -63,15 +57,6 @@ class Monitor:
             "timestamp": int(datetime.now().timestamp()),
             "is_ok": res is not None,
             "params": res,
-        }
-        return response
-
-    def get_interlock(self) -> dict:
-        res = self.__system_check.check_interlock()
-        response = {
-            "timestamp": int(datetime.now().timestamp()),
-            "is_ok": res is not None,
-            "system_health_report": res,
         }
         return response
 

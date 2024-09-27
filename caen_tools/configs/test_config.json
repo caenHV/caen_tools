@@ -99,6 +99,5 @@
         "20" : 50,
         "21" : 50,
         "-1" : 0.0
-    },
-    "ramp_up_max_current_multiplier" : 1.5
+    }
 }

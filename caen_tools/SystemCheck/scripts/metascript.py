@@ -14,7 +14,6 @@ class SharedParamsDict(TypedDict):
 
 
 class Script(ABC):
-    logger = logging.getLogger("MetaScript class")
 
     def __init__(self, shared_parameters: SharedParamsDict):
         self.task = None
@@ -31,24 +30,24 @@ class Script(ABC):
         self.shared_parameters["enable"] = True
 
         if self.isrunning:
-            self.logger.warning("Scenario is already started")
+            logging.warning("Scenario is already started")
             return
 
         asyncio.create_task(self.on_start())
         self.task = asyncio.create_task(self.loop())
-        self.logger.info("Start scenario")
+        logging.info("Start scenario")
         return
 
     def stop(self) -> None:
         """Stops a scenario loop"""
         if not self.isrunning:
-            self.logger.debug("Script is already stopped. No need stop")
+            logging.debug("Script is already stopped. No need stop")
             return
 
         self.shared_parameters["enable"] = False
         self.task = None
         asyncio.create_task(self.on_stop())
-        self.logger.warning("Stop the script")
+        logging.warning("Stop the script")
         return
 
     def trigger(self) -> None:
@@ -82,9 +81,9 @@ class Script(ABC):
             exectime = timeit.default_timer() - starttime
             repeat_every = self.shared_parameters["repeat_every"]
             await asyncio.sleep(max(0, repeat_every - exectime))
-            self.logger.debug("scenario exec function is completed")
+            logging.debug("scenario exec function is completed")
         except asyncio.CancelledError:
-            self.logger.info("Task was cancelled")
+            logging.info("Task was cancelled")
             return False
 
         if self.shared_parameters["enable"] is True:
