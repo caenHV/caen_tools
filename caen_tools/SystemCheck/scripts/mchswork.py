@@ -67,5 +67,6 @@ class MChSWorker:
     def send_state(self):
         """Sends an acknowledge status to the server"""
         logging.info("Send ack %s to MChS", self.isack)
+        logging.debug("MChS dict state %s", self.__state)
         MChSWorker.send(self.udp_ip, self.udp_port, self.client_id, self.isack)
         return

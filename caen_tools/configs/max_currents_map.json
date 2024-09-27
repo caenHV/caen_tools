@@ -1,0 +1,28 @@
+{
+    "max_current" : {
+        "1"  : {"volt_change" : 2, "steady" : 2}, 
+        "2"  : {"volt_change" : 2, "steady" : 2},
+        "3"  : {"volt_change" : 2, "steady" : 2},
+        "4"  : {"volt_change" : 2, "steady" : 2},
+        "5"  : {"volt_change" : 2, "steady" : 2},
+        "6"  : {"volt_change" : 2, "steady" : 2},
+        "7"  : {"volt_change" : 2, "steady" : 2},
+        "8"  : {"volt_change" : 2, "steady" : 2},
+        "9"  : {"volt_change" : 2, "steady" : 2},
+        "10" : {"volt_change" : 2, "steady" : 2},
+        "11" : {"volt_change" : 2, "steady" : 2},
+        "12" : {"volt_change" : 2, "steady" : 2},
+        "13" : {"volt_change" : 2, "steady" : 2},
+        "14" : {"volt_change" : 2, "steady" : 2},
+        "15" : {"volt_change" : 2, "steady" : 2},
+        "16" : {"volt_change" : 2, "steady" : 2},
+        "17" : {"volt_change" : 2, "steady" : 2},
+        "18" : {"volt_change" : 2, "steady" : 2},
+        "19" : {"volt_change" : 2, "steady" : 2},
+        "20" : {"volt_change" : 2, "steady" : 2},
+        "21" : {"volt_change" : 2, "steady" : 2},
+        "F" : {"volt_change" : 2, "steady" : 2},
+        "R1" : {"volt_change" : 2, "steady" : 2},
+        "R2" : {"volt_change" : 2, "steady" : 2}
+    }
+}

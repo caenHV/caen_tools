@@ -53,7 +53,7 @@ class APIMethods:
     @staticmethod
     def execute_send(receipt: Receipt, monitor: Monitor):
         """Sends device parameters in Monitor.
-        Monitor writes them in the DB and returns health report"""
+        Monitor writes them in the DB and returns {}"""
         response = monitor.send_params(
             receipt.params, measurement_time=receipt.timestamp
         )
@@ -80,20 +80,6 @@ class APIMethods:
         return receipt
 
     @staticmethod
-    def execute_get_interlock(receipt: Receipt, monitor: Monitor):
-        """Returns interlock status"""
-        response = monitor.get_interlock()
-        receipt.response = ReceiptResponse(
-            statuscode=1 if response["is_ok"] else 0,
-            body=(
-                response["system_health_report"]
-                if response["is_ok"]
-                else "Something is wrong in the DB. No rows selected."
-            ),
-        )
-        return receipt
-
-    @staticmethod
     def wrongroute(receipt: Receipt) -> Receipt:
         """Default answer for the wrong title field in the receipt"""
         receipt.response = ReceiptResponse(
@@ -107,7 +93,6 @@ class APIFactory:
         "status": APIMethods.status,
         "send_params": APIMethods.execute_send,
         "get_params": APIMethods.execute_get,
-        "get_interlock": APIMethods.execute_get_interlock,
     }
 
     @staticmethod
@@ -135,6 +120,10 @@ def main():
     address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
     param_file_path = settings.get("monitor", "param_file_path")
+    is_high_Imon_range = settings.getboolean(
+        "device", "is_high_Imon_range", fallback=True
+    )
+    current_par_key = "IMonH" if is_high_Imon_range else "IMonL"
 
     get_logging_config(
         level=settings.get("monitor", "loglevel"),
@@ -145,7 +134,7 @@ def main():
         dict(settings.items("monitor")),
     )
 
-    monitor = Monitor(dbpath, param_file_path)
+    monitor = Monitor(dbpath, param_file_path, current_par_key)
 
     dbs = RouterServer(address, "monitor")
 
