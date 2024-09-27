@@ -40,29 +40,30 @@ class HealthParameters(Script):
 
     @staticmethod
     def __check_ch_status(pars: dict) -> bool:
+        def good_status(ch_status: str) -> bool:
+            st = format(int(ch_status), "015b")[::-1][3:13]
+            return int(st) == 0
+
         status = False
         try:
-            ch_status_list = [
-                int(bin(int(val["ChStatus"]))[2:]) > 111 for _, val in pars.items()
-            ]
-            status = not any(ch_status_list)
+            ch_status_good = [good_status(val["ChStatus"]) for _, val in pars.items()]
+            status = all(ch_status_good)
         except Exception as e:
             logging.warning("Can't check channels status. %s", e)
         logging.info("Channels status is %s", "good" if status else "bad")
         return status
 
     def __check_currents(self, pars: dict) -> bool:
-        status = False
-
-        def max_cur_key(ch_status: str) -> str:
-            st = format(int(ch_status), "015b")[::-1]
+        def max_current_key(ch_status: str) -> str:
+            st = format(int(ch_status), "015b")[::-1][:13]
             key = "volt_change" if int(st[1]) == 1 or int(st[2]) == 1 else "steady"
             return key
 
+        status = False
         try:
             currents_status = [
                 val[self.__imon_key]
-                < self.__max_currents[ch][max_cur_key(val["ChStatus"])]
+                < self.__max_currents[ch][max_current_key(val["ChStatus"])]
                 for ch, val in pars.items()
             ]
             status = all(currents_status)
