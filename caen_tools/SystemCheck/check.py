@@ -3,6 +3,8 @@ import argparse
 import logging
 import signal
 import os
+import pathlib
+import json
 import multiprocessing as mp
 
 from caen_tools.SystemCheck.server import run_server
@@ -62,6 +64,24 @@ def main():
         mchs=mchs_dict,
     )
 
+    is_high_Imon_range = settings.getboolean(
+        "device", "is_high_Imon_range", fallback=True
+    )
+    current_par_key = "IMonH" if is_high_Imon_range else "IMonL"
+
+    max_currents_map_path = pathlib.Path(
+        settings.get(CONFIG_SECTION, "max_currents_map_path")
+    )
+    try:
+        with open(max_currents_map_path) as f:
+            max_currents_map = json.load(f)
+    except json.JSONDecodeError as e:
+        logging.warning("Invalid JSON syntax in max_currents_map_path: %s", e)
+        raise e
+    except OSError as e:
+        logging.warning("max_currents_map_path points to a nonexistent file: %s", e)
+        raise e
+
     worker = mp.Process(
         target=run_worker,
         args=(
@@ -69,6 +89,8 @@ def main():
             settings.get(CONFIG_SECTION, "device_backend"),
             settings.get(CONFIG_SECTION, "monitor"),
             settings.get(CONFIG_SECTION, "interlock_db_uri"),
+            current_par_key,
+            max_currents_map,
         ),
     )
     serv = mp.Process(

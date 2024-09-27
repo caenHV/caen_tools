@@ -16,6 +16,8 @@ def run_worker(
     devback_address: str,
     mon_address: str,
     interlock_db_uri: str,
+    imon_key: str,
+    max_currents: dict[str, dict[str, float]],
 ):
     """Worker running different scenarios for system control"""
 
@@ -31,6 +33,8 @@ def run_worker(
         mon_address,
         mchs=mchs,
         stop_on_failure=[interlock],
+        imon_key=imon_key,
+        max_currents=max_currents,
     )
     manager = ManagerScript([interlock, health])
 
