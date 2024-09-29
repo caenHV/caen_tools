@@ -78,29 +78,31 @@ def get_logging_config(
     logging.Formatter.converter = lambda *args: datetime.now(
         ZoneInfo("Asia/Novosibirsk")
     ).timetuple()
-    dictConfig({
-        "version": 1,
-        "formatters": {
-            "default": {
-                "format": "[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d:: %(message)s",
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-            }
-        },
-        "handlers": {
-            "stream": {
-                "class": "logging.StreamHandler",
-                "formatter": "default",
+    dictConfig(
+        {
+            "version": 1,
+            "formatters": {
+                "default": {
+                    "format": "[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d:: %(message)s",
+                    "datefmt": "%Y-%m-%d %H:%M:%S",
+                }
             },
-            "default": {
-                "class": "logging.handlers.TimedRotatingFileHandler",
-                "formatter": "default",
-                "filename": filepath,
-                "when": "midnight",
-                "encoding": "utf-8",
-                "backupCount": backup_count,
+            "handlers": {
+                "stream": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "default",
+                },
+                "default": {
+                    "class": "logging.handlers.TimedRotatingFileHandler",
+                    "formatter": "default",
+                    "filename": filepath,
+                    "when": "midnight",
+                    "encoding": "utf-8",
+                    "backupCount": backup_count,
+                },
             },
-        },
-        "root": {"level": level, "handlers": handlers},
-    })
+            "root": {"level": level, "handlers": handlers},
+        }
+    )
     logging.debug("Set logging settings")
     return

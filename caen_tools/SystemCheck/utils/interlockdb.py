@@ -1,5 +1,7 @@
-import logging
 from urllib.parse import urlparse
+
+import logging
+
 import psycopg2
 from caen_tools.SystemCheck.scripts.structures import InterlockState
 
@@ -8,6 +10,15 @@ class InterlockManager:
     """Class for interaction with SND interlock database"""
 
     def __init__(self, interlock_db_uri: str):
+        """For reading fake interlock value from user defined file
+        use interlock_db_uri in format like: fake://./interlock.txt
+        """
+
+        self._fakepath = None
+        if interlock_db_uri.startswith("fake://"):
+            self._fakepath = interlock_db_uri.split("://")[-1]
+            return
+
         parsed_uri = urlparse(interlock_db_uri)
         self.__db_credentials = {
             "dbname": parsed_uri.path[1:],
@@ -29,6 +40,12 @@ class InterlockManager:
 
     @property
     def get_interlock(self) -> InterlockState:
+        if self._fakepath:
+            with open(self._fakepath, "r", encoding="utf-8") as f:
+                interlock = int(f.read())
+            logging.debug("Fake interlock value is %s", interlock)
+            return InterlockState(interlock)
+
         res = None
         if self.__conn is None:
             self.__conn = self.__connect()
@@ -40,12 +57,11 @@ class InterlockManager:
                 )
                 res = cursor.fetchone()
         except psycopg2.OperationalError as e:
-            logging.warning("Not connected to SND database: %s", e)
+            logging.warning("Not connected to SND database", exc_info=True)
             return InterlockState(current_state=True)
         except Exception as e:
             logging.warning(
-                "Problems with getting interlock from the SND Database: %s.",
-                e,
+                "Problems with getting interlock from the SND Database", exc_info=True
             )
             return InterlockState(current_state=True)
 

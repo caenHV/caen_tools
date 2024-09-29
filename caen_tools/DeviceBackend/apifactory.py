@@ -1,5 +1,7 @@
 """Defines API methods for DeviceBackend microservice"""
 
+from functools import reduce
+
 import json
 import logging
 from caen_setup import Handler
@@ -11,15 +13,11 @@ from caen_setup.Tickets.Tickets import (
 )
 
 from caen_tools.utils.receipt import Receipt, ReceiptResponse
-from caen_tools.utils.resperrs import RResponseErrors
 
 
 class APIMethods:
     """Contains implementations of the API methods
     of the microservice"""
-
-    ENABLE_USER_SET = True  # can user set voltage (down working always)
-    USER_TARGET_VOLTAGE = 0  # last value of voltage requested by some user
 
     @staticmethod
     def ticketexec(ticket: Ticket, h: Handler) -> ReceiptResponse:
@@ -62,19 +60,25 @@ class APIMethods:
         receipt.params must correspond SetVoltage_Ticket.type_description
         """
         logging.debug("Start set_voltage ticket")
-        forbidden_use = (APIMethods.ENABLE_USER_SET is False) and receipt.params.get(
-            "from_user", False
-        )
-        if forbidden_use:
-            receipt.response = RResponseErrors.ForbiddenMethod(
-                "Set voltage by user is forbidden"
-            )
-            return receipt
 
         ticket = SetVoltage_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
-        if receipt.params.get("from_user", False):
-            APIMethods.USER_TARGET_VOLTAGE = receipt.params["target_voltage"]
+        return receipt
+
+    @staticmethod
+    def get_voltage(receipt: Receipt, h: Handler) -> Receipt:
+        """Returns current voltage multiplier"""
+
+        logging.debug("Start get_voltage multiplier")
+        ticket = GetParams_Ticket({"select_params": ["VSet", "VDef"]})
+        receipt.response = APIMethods.ticketexec(ticket, h)
+
+        rawdata = receipt.response.body["params"]
+        VDef = reduce(lambda x, y: x + y["params"]["VDef"], rawdata, 0)
+        VSet = reduce(lambda x, y: x + y["params"]["VSet"], rawdata, 0)
+        logging.debug("VSet = %s, VDef = %s", VSet, VDef)
+
+        receipt.response.body = dict(multiplier=VSet / VDef if VDef > 0 else None)
         return receipt
 
     @staticmethod
@@ -108,28 +112,6 @@ class APIMethods:
         logging.debug("Start down ticket")
         ticket = Down_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
-        APIMethods.USER_TARGET_VOLTAGE = 0
-        return receipt
-
-    @staticmethod
-    def get_user_permission(receipt: Receipt, h: Handler) -> Receipt:
-        """Sets permission of the user to use set_voltage"""
-
-        logging.debug("Start get_user_permission")
-        receipt.response = ReceiptResponse(
-            statuscode=1, body={"enable_user_set": APIMethods.ENABLE_USER_SET}
-        )
-        return receipt
-
-    @staticmethod
-    def set_user_permission(receipt: Receipt, h: Handler) -> Receipt:
-        """Sets permission of the user to use set_voltage"""
-
-        logging.debug("Start set_user_permission")
-        APIMethods.ENABLE_USER_SET = bool(receipt.params["enable_user_set"])
-        receipt.response = ReceiptResponse(
-            statuscode=1, body={"enable_user_set": APIMethods.ENABLE_USER_SET}
-        )
         return receipt
 
     @staticmethod
@@ -149,10 +131,9 @@ class APIFactory:
     apiroutes = {
         "status": APIMethods.status,
         "set_voltage": APIMethods.set_voltage,
+        "get_voltage": APIMethods.get_voltage,
         "params": APIMethods.params,
         "down": APIMethods.down,
-        "get_user_permission": APIMethods.get_user_permission,
-        "set_user_permission": APIMethods.set_user_permission,
     }
 
     @staticmethod

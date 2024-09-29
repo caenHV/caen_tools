@@ -10,6 +10,7 @@ import multiprocessing as mp
 from caen_tools.SystemCheck.server import run_server
 from caen_tools.SystemCheck.worker import run_worker
 from caen_tools.utils.utils import config_processor, get_logging_config
+from .utils import sharedmemo_fillup, parse_max_currents
 
 CONFIG_SECTION = "check"
 
@@ -38,49 +39,12 @@ def main():
     logging.info(
         "Start SysCheck with arguments %s", dict(settings.items(CONFIG_SECTION))
     )
-
-    mchs_dict = dict(
-        udp_ip=settings.get(CONFIG_SECTION, "mchs_host"),
-        udp_port=settings.get(CONFIG_SECTION, "mchs_port"),
-        client_id=settings.get(CONFIG_SECTION, "mchs_client_id"),
+    max_currents = parse_max_currents(
+        settings.get(f"{CONFIG_SECTION}.health", "max_currents_map_path")
     )
 
     manager = mp.Manager()
-    shared_parameters = manager.dict(
-        interlock=manager.dict(
-            enable=settings.getboolean(CONFIG_SECTION, "interlock_follow"),
-            repeat_every=60,
-            last_check=0,
-            voltage_modifier=settings.getfloat(
-                CONFIG_SECTION, "interlock_voltage_modifier"
-            ),
-            target_voltage=0,
-        ),
-        health=manager.dict(
-            enable=True,
-            repeat_every=1,
-            last_check=0,
-        ),
-        mchs=mchs_dict,
-    )
-
-    is_high_Imon_range = settings.getboolean(
-        "device", "is_high_Imon_range", fallback=True
-    )
-    current_par_key = "IMonH" if is_high_Imon_range else "IMonL"
-
-    max_currents_map_path = pathlib.Path(
-        settings.get(CONFIG_SECTION, "max_currents_map_path")
-    )
-    try:
-        with open(max_currents_map_path, "r", encoding="utf-8") as f:
-            max_currents_map = json.load(f)["max_current"]
-    except json.JSONDecodeError as e:
-        logging.warning("Invalid JSON syntax in max_currents_map_path: %s", e)
-        raise e
-    except OSError as e:
-        logging.warning("max_currents_map_path points to a nonexistent file: %s", e)
-        raise e
+    shared_parameters = sharedmemo_fillup(manager, settings, CONFIG_SECTION)
 
     worker = mp.Process(
         target=run_worker,
@@ -89,8 +53,7 @@ def main():
             settings.get(CONFIG_SECTION, "device_backend"),
             settings.get(CONFIG_SECTION, "monitor"),
             settings.get(CONFIG_SECTION, "interlock_db_uri"),
-            current_par_key,
-            max_currents_map,
+            max_currents,
         ),
     )
     serv = mp.Process(

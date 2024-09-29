@@ -1,21 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import TypedDict
 
 import asyncio
 import timeit
 import logging
 
-
-class SharedParamsDict(TypedDict):
-    """Defines a structure of shared parameters dictionary"""
-
-    enable: bool
-    repeat_every: int
+from .structures import MinimalScriptDict
 
 
 class Script(ABC):
 
-    def __init__(self, shared_parameters: SharedParamsDict):
+    def __init__(self, shared_parameters: MinimalScriptDict):
         self.task = None
         self.shared_parameters = shared_parameters
 
@@ -85,6 +79,11 @@ class Script(ABC):
         except asyncio.CancelledError:
             logging.info("Task was cancelled")
             return False
+        except Exception as ex:
+            logging.error("Task was failed", exc_info=True)
+            self.task = None
+            # self.shared_parameters["enable"] = False
+            raise ex
 
         if self.shared_parameters["enable"] is True:
             self.task = asyncio.create_task(self.loop())

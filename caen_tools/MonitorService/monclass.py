@@ -1,15 +1,19 @@
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 
-from caen_tools.ODB_handler.ODB_Handler import ODB_Handler
+from .ODB import ODB_Handler
 
 
 class Monitor:
-    def __init__(self, dbpath: str, param_file_path: str, current_key: str = "IMnoH"):
+    def __init__(self, dbpath: str, param_file_path: str):
         self.__odb = ODB_Handler(dbpath)
         self.__param_file_path = Path(param_file_path)
-        self.__imon_key: str = current_key
+
+    @staticmethod
+    def __imon_key(val_ImonRange: int) -> str:
+        return "IMonH" if val_ImonRange == 0 else "IMonL"
 
     def __process_response(self, res_dict, measurement_time):
         ts = measurement_time
@@ -19,7 +23,8 @@ class Monitor:
         res_list = []
         for chidx, val in res.items():
             status = int(bin(int(val["ChStatus"]))[2:])
-            res_list.append((chidx, val["VMon"], val[self.__imon_key], ts, status))
+            imon_key = self.__imon_key(int(val["ImonRange"]))
+            res_list.append((chidx, val["VMon"], val[imon_key], ts, status))
         return res_list
 
     def send_params(self, params: dict, measurement_time: int) -> dict:
@@ -39,6 +44,7 @@ class Monitor:
                 "is_ok" : True for ok and False if something is wrong.
             }
         """
+        logging.debug("Start sending parameters to ODB")
         cooked_res_list = self.__process_response(params, measurement_time)
         is_ok = self.__odb.write_params(cooked_res_list, self.__param_file_path)
         response = {
@@ -48,14 +54,11 @@ class Monitor:
         return response
 
     def get_params(self, start: int, end: int) -> dict:
+        logging.debug("Start getting parameters from ODB")
         res = self.__odb.get_params(start, end)
         response = {
             "timestamp": int(datetime.now().timestamp()),
             "is_ok": res is not None,
             "params": res,
         }
-        return response
-
-    def is_ok(self) -> dict:
-        response = {"timestamp": int(datetime.now().timestamp()), "is_ok": True}
         return response

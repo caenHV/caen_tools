@@ -1,4 +1,9 @@
 from .manager import ManagerScript
-from .healthparams import HealthParameters
-from .autopilot import AutopilotControl
 from .mchswork import MChSWorker
+
+# Scripts
+from .health import HealthControl
+from .interlock import InterlockControl
+from .loader import LoaderControl
+from .reducer import ReducerControl
+from .relax import RelaxControl

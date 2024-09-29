@@ -31,12 +31,6 @@ async def process_message(dbs: RouterServer, monitor: Monitor) -> None:
     return
 
 
-def check_receipt(receipt: Receipt) -> bool:
-    """Check input receipt"""
-    is_executor = receipt.executor.lower() == "monitor"
-    return is_executor
-
-
 class APIMethods:
     """Contains implementations of the API methods
     of the microservice"""
@@ -44,10 +38,7 @@ class APIMethods:
     @staticmethod
     def status(receipt: Receipt, monitor: Monitor):
         """Returns status of the microservice"""
-        response = monitor.is_ok()
-        receipt.response = ReceiptResponse(
-            statuscode=1 if response["is_ok"] else 0, body={}
-        )
+        receipt.response = ReceiptResponse(statuscode=1, body={})
         return receipt
 
     @staticmethod
@@ -99,8 +90,11 @@ class APIFactory:
     def execute_receipt(receipt: Receipt, monitor: Monitor) -> Receipt:
         """Matches a function to execute input receipt"""
 
-        if receipt.title in APIFactory.apiroutes and check_receipt(receipt):
-            return APIFactory.apiroutes[receipt.title](receipt, monitor)
+        if receipt.title in APIFactory.apiroutes:
+            try:
+                return APIFactory.apiroutes[receipt.title](receipt, monitor)
+            except:
+                logging.error("Not processed %s", receipt, exc_info=True)
         return APIMethods.wrongroute(receipt)
 
 
@@ -120,10 +114,6 @@ def main():
     address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
     param_file_path = settings.get("monitor", "param_file_path")
-    is_high_Imon_range = settings.getboolean(
-        "device", "is_high_Imon_range", fallback=True
-    )
-    current_par_key = "IMonH" if is_high_Imon_range else "IMonL"
 
     get_logging_config(
         level=settings.get("monitor", "loglevel"),
@@ -134,7 +124,7 @@ def main():
         dict(settings.items("monitor")),
     )
 
-    monitor = Monitor(dbpath, param_file_path, current_par_key)
+    monitor = Monitor(dbpath, param_file_path)
 
     dbs = RouterServer(address, "monitor")
 

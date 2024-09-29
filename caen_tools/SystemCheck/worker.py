@@ -4,11 +4,15 @@ import asyncio
 import logging
 
 from caen_tools.SystemCheck.scripts import (
-    HealthParameters,
     ManagerScript,
-    AutopilotControl,
     MChSWorker,
+    LoaderControl,
+    InterlockControl,
+    HealthControl,
+    RelaxControl,
+    ReducerControl,
 )
+from .utils import InterlockManager
 
 
 def run_worker(
@@ -16,27 +20,33 @@ def run_worker(
     devback_address: str,
     mon_address: str,
     interlock_db_uri: str,
-    imon_key: str,
-    max_currents: dict[str, dict[str, float]],
+    max_currents: dict,
 ):
     """Worker running different scenarios for system control"""
 
     logging.info("Start worker %s, %s", devback_address, mon_address)
 
+    # Specific utility classes
     mchs = MChSWorker(**shared_parameters["mchs"])
-    interlock = AutopilotControl(
-        shared_parameters["interlock"], devback_address, interlock_db_uri
+    interlockdb = InterlockManager(interlock_db_uri)
+
+    # A number of running scripts
+    loader = LoaderControl(shared_parameters["loader"], devback_address, mon_address)
+    interlock = InterlockControl(shared_parameters["interlock"], interlockdb, mchs)
+    relax = RelaxControl(shared_parameters["relax"], devback_address, interlockdb)
+    reducer = ReducerControl(
+        shared_parameters["reducer"], devback_address, interlockdb, mchs, relax
     )
-    health = HealthParameters(
+    health = HealthControl(
         shared_parameters["health"],
         devback_address,
         mon_address,
-        mchs=mchs,
-        stop_on_failure=[interlock],
-        imon_key=imon_key,
-        max_currents=max_currents,
+        mchs,
+        max_currents,
+        [relax, reducer],
     )
-    manager = ManagerScript([interlock, health])
+
+    manager = ManagerScript([loader, interlock, relax, reducer, health])
 
     # Start manager and included scenarios
     loop = manager.start()

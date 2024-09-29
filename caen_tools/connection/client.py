@@ -42,16 +42,16 @@ class AsyncClient(BaseClient):
         waiting time for server answer (in seconds)
     """
 
-    def __init__(
-        self, connect_addresses: Dict[str, str], receive_time: int  = 20
-    ):
+    def __init__(self, connect_addresses: Dict[str, str], receive_time: int = 20):
         logging.debug("Start AsyncCli initialization")
         context = zmq.asyncio.Context()
         self.socket = context.socket(zmq.DEALER)
         self.connect_addresses = connect_addresses
         super().__init__(context, int(receive_time))
 
-    async def query(self, receipt: Receipt, receive_time: float | None = None) -> Receipt:
+    async def query(
+        self, receipt: Receipt, receive_time: float | None = None
+    ) -> Receipt:
         """Query and response
 
         Parameters
@@ -82,7 +82,7 @@ class AsyncClient(BaseClient):
         receipt_str = json.dumps(receipt, cls=ReceiptJSONEncoder).encode("utf-8")
         s = self.context.socket(zmq.DEALER)
         connect_address = self.connect_addresses[receipt.executor]
-        
+
         if receive_time is not None:
             s.setsockopt(zmq.RCVTIMEO, receive_time * 1000)
 

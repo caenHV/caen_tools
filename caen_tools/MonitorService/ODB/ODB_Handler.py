@@ -83,7 +83,7 @@ class ODB_Handler:
 
         return is_ok
 
-    def get_params(self, start: int, end: int) -> list | None:
+    def get_params(self, start: int, end: int) -> list[dict] | None:
         is_ok = True
         with self.con as con:
             try:
