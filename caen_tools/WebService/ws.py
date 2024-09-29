@@ -22,6 +22,7 @@ from sse_starlette.sse import EventSourceResponse
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.utils import config_processor, get_timestamp, get_logging_config
 from caen_tools.utils.receipt import Receipt
+from caen_tools.utils.resperrs import RResponseErrors
 from caen_tools.WebService.utils import response_provider, send_mail, broadcaster
 
 # Initialization part
@@ -87,8 +88,6 @@ tags_metadata = [
     },
 ]
 
-INTERLOCK_VAL = settings.get("ws", "interlock_follow")
-
 app = FastAPI(
     title="CAEN Manager App",
     summary="Application to run high voltage on CAEN",
@@ -153,6 +152,8 @@ async def devback_status(sender: str = "webcli", receive_time: float | None = No
     """Returns a status of DeviceBackend
     (cache during 1 s)
     """
+
+    logging.debug("Start devback_status")
     receipt = Receipt(
         sender=sender,
         executor=Services.DEVBACK.title,
@@ -174,29 +175,9 @@ async def read_parameters(sender: str = "webcli") -> Receipt:
     - **sender**: string identifier of the request sender
     """
 
+    logging.info("Start devback status task")
     response = await devback_status(sender)
     return response
-
-@app.get(f"/{Services.DEVBACK.title}/user_permissions", tags=[Services.DEVBACK.title])
-@response_provider
-async def get_user_permission(sender: str = "webcli") -> Receipt:
-    """[WS Backend API]
-    Returns user permissions for setting voltaget.
-
-    Parameters
-    ----------
-    - **sender**: string identifier of the request sender
-    """
-
-    receipt = Receipt(
-        sender=sender,
-        executor=Services.DEVBACK.title,
-        title="get_user_permission",
-        params={},
-    )
-    resp = await cli.query(receipt)
-    return resp
-
 
 @app.post(f"/{Services.DEVBACK.title}/set_voltage", tags=[Services.DEVBACK.title])
 @response_provider
@@ -211,36 +192,69 @@ async def set_voltage(
     - **target_voltage**: float value of the voltage to be set
     - **sender**: string identifier of the request sender
     """
-    receipt = Receipt(
+
+    logging.info("Start setting voltage task by %s: %.3f", sender, target_voltage)
+    
+    set_voltage = Receipt(
         sender=sender,
         executor=Services.DEVBACK.title,
         title="set_voltage",
         params={"target_voltage": target_voltage, "from_user": True},
     )
+
+    # Check if autopilot is enabled
+    autopilot = Receipt(
+        sender=sender,
+        executor=Services.SYSCHECK.title,
+        title="status_autopilot",
+        params={}
+    )
+    autopilot = await cli.query(autopilot, 1)
+    logging.error("AUTO %s", autopilot)
+    if autopilot.response.statuscode == 1:
+        if autopilot.response.body["interlock_follow"]:
+            set_voltage.response = RResponseErrors.ForbiddenMethod(
+                msg = "SetVoltage is not enabled (due to enabled autopilot)"
+            )
+            return set_voltage
+
     logging.debug("Start setting voltage %s", target_voltage)
-    resp = await cli.query(receipt)
+    set_voltage = await cli.query(set_voltage)
     logging.debug("Voltage set on %s", target_voltage)
-    return resp
+    return set_voltage
 
 
 @app.post(f"/{Services.DEVBACK.title}/down", tags=[Services.DEVBACK.title])
 @response_provider
 async def down(sender: Annotated[str, Body(embed=True)] = "webcli") -> Receipt:
     """[WS Backend API]
-    Turns off voltage from CAEN setup
+    Emergency call:
+      Turns off voltage from CAEN device
+      and turns off autopilot (if on)
 
     Parameters
     ----------
     - **sender**: string identifier of the request sender
     """
-    receipt = Receipt(
+
+    logging.info("Start down voltage task")
+    down_voltage = Receipt(
         sender=sender,
         executor=Services.DEVBACK.title,
         title="down",
         params={},
     )
-    resp = await cli.query(receipt)
-    return resp
+    down_resp = await cli.query(down_voltage)
+
+    autopilot_off = Receipt(
+        sender=sender,
+        executor=Services.SYSCHECK.title,
+        title="set_autopilot",
+        params={"value": False, "target_voltage": 0},
+    )
+    autopilot_resp = await cli.query(autopilot_off, receive_time=1)
+
+    return down_resp
 
 
 @alru_cache(ttl=1)
@@ -253,6 +267,7 @@ async def device_params(sender: str = "webcli") -> Receipt:
     - **sender**: string identifier of the request sender
     """
 
+    logging.info("Start get device params cached function")
     receipt = Receipt(
         sender=sender,
         executor=Services.DEVBACK.title,
@@ -276,6 +291,7 @@ async def device_params_api(
     - **sender**: string identifier of the request sender
     """
 
+    logging.debug("Start device_params_api")
     response = await device_params(sender)
     return response
 
@@ -288,6 +304,8 @@ async def monitor_status(sender: str = "webcli", receive_time: float | None = No
     """Returns a status of Monitor
     (cache during 1 s)
     """
+
+    logging.debug("Start monitor_status")
     receipt = Receipt(
         sender=sender,
         executor=Services.MONITOR.title,
@@ -308,6 +326,8 @@ async def monstatus(sender: Annotated[str, Query(max_length=50)] = "webcli") -> 
     ----------
     - **sender**: string identifier of the request sender
     """
+
+    logging.info("Start monitor status task")
     response = await monitor_status(sender)
     return response
 
@@ -328,6 +348,8 @@ async def paramsdb(
     - **stop_timestamp**: stop timestamp for data retrieval  (in seconds)
     - **sender**: string identifier of the request sender
     """
+
+    logging.info("Start paramsdb task")
     stop_timestamp = get_timestamp() if stop_timestamp is None else stop_timestamp
     receipt = Receipt(
         sender=sender,
@@ -357,6 +379,7 @@ async def setparamsdb(
     - **sender**: string identifier of the request sender
     """
 
+    logging.info("Start set_params_to_db task")
     receipt = Receipt(
         sender=sender,
         executor=Services.MONITOR.title,
@@ -376,6 +399,8 @@ async def syscheck_status(sender: str = "webcli", receive_time: float | None = N
     """Returns a status of System Check
     (cache during 1 s)
     """
+
+    logging.debug("Start syscheck status")
     receipt = Receipt(
         sender=sender,
         executor=Services.SYSCHECK.title,
@@ -397,7 +422,8 @@ async def status_api(
     ----------
     - **sender**: string identifier of the request sender
     """
-    
+
+    logging.info("Start syschek status task")
     resp = await syscheck_status(sender)
     return resp
 
@@ -417,6 +443,7 @@ async def is_interlock_follow(
     - **sender**: string identifier of the request sender
     """
 
+    logging.info("Start autopilot status")
     receipt = Receipt(
         sender=sender,
         executor=Services.SYSCHECK.title,
@@ -437,7 +464,7 @@ async def set_interlock_follow(
     sender: Annotated[str, Body(max_length=50)] = "webcli",
 ) -> Receipt:
     """[WS Backend API]
-    Sets a state of the interlock following
+    Sets a state of the Autopilot
 
     Parameters
     ----------
@@ -446,6 +473,7 @@ async def set_interlock_follow(
     - **sender**: string identifier of the request sender
     """
 
+    logging.info("Start set_autopilot")
     receipt = Receipt(
         sender=sender,
         executor=Services.SYSCHECK.title,
@@ -464,6 +492,7 @@ async def devback_status_broadcast() -> EventSourceResponse:
     Do not use different **senders** to acheive boost from cache functions
     """
 
+    logging.debug("Start events/status")
     async def get_status(sender: str, rcv_time: float):
         async with asyncio.TaskGroup() as tg:
             devback = tg.create_task(devback_status(sender, rcv_time))
@@ -490,6 +519,7 @@ async def device_params_broadcast() -> EventSourceResponse:
     Do not use sender to acheive the boost from cache function
     """
 
+    logging.info("Start devback/params_broadcast")
     delay = 1  # in seconds
     return EventSourceResponse(
         broadcaster(delay, device_params, sender="eventstream"), send_timeout=5

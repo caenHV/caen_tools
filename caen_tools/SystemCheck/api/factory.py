@@ -7,8 +7,8 @@ class APIFactory:
 
     apiroutes = {
         "status": APIMethods.status,
-        "status_autopilot": APIMethods.is_interlock_follow,
-        "set_autopilot": APIMethods.set_ilock_follow,
+        "status_autopilot": APIMethods.autopilot_enable,
+        "set_autopilot": APIMethods.set_autopilot,
     }
 
     @staticmethod

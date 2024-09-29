@@ -1,7 +1,15 @@
 from dataclasses import dataclass
 from typing import TypedDict
+from enum import Flag, auto
 
 from caen_tools.utils.utils import get_timestamp
+
+class Codes(Flag):
+    """Enum with statuscodes"""
+
+    OK = auto()
+    DEVBACK_ERROR = auto()
+    MONITOR_ERROR = auto()
 
 
 @dataclass
@@ -15,7 +23,6 @@ class InterlockState:
         if self.timestamp is None:
             self.timestamp = get_timestamp()
 
-
 class MCHSDict(TypedDict):
     """MChS config structure"""
 
@@ -24,19 +31,47 @@ class MCHSDict(TypedDict):
     client_id: str
 
 
-class AutopilotParamsDict(TypedDict):
-    """Defines shared parameters dict structure for AutopilotControl script"""
+@dataclass
+class CheckResult:
+    """Configuration of the check result"""
+    statuscode: Codes
+    timestamp: int = None
 
+    def __post_init__(self):
+        if self.timestamp is None:
+            self.timestamp = get_timestamp()
+            
+
+class MinimalScriptDict(TypedDict):
+    """Minimal script config structure"""
     enable: bool
-    repeat_every: int
+    repeat_every: float
+    last_check: CheckResult | None
+
+class LoaderDict(MinimalScriptDict):
+    """Loader script config structure"""
+
+class HealthParametersDict(MinimalScriptDict):
+    """Defines shared parameters dict structure for HealthParameters script"""
+
+class InterlockParametersDict(MinimalScriptDict):
+    """Defines shared parameters dict structure for Interlock polling script"""
+
+class RelaxParamsDict(MinimalScriptDict):
+    """Defines shared parameters dict structure for RelaxControl script"""
     voltage_modifier: float
-    last_check: int
     target_voltage: float
 
+class ReducerParametersDict(RelaxParamsDict):
+    """Defines shared parameters dict structure for ScheduledReducer script"""
+    reducing_time: float
 
-class HealthParametersDict(TypedDict):
-    """Defines shared parameters dict structure for HealthParameters scenario"""
+class SharedParametersDict(TypedDict):
+    """Shared memory dictionary"""
 
-    enable: bool
-    repeat_every: int
-    last_check: int
+    loader: LoaderDict
+    health: HealthParametersDict
+    interlock: InterlockParametersDict
+    relax: RelaxParamsDict
+    reducer: ReducerParametersDict
+    mchs: MCHSDict

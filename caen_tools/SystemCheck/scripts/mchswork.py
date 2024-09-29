@@ -51,7 +51,7 @@ class MChSWorker:
         self.udp_ip = udp_ip
         self.udp_port = udp_port
         self.client_id = client_id
-        self.__state = dict(health_params=None, interlock=None)
+        self.__state = dict()
 
     @property
     def isack(self) -> bool:
@@ -62,11 +62,15 @@ class MChSWorker:
     def set_state(self, **kwargs):
         """Sets an acknowledge"""
         logging.debug("Set state for mchs worker")
-        self.__state.update((k, kwargs[k]) for k in kwargs.keys() & self.__state.keys())
+        self.__state.update(kwargs)
+
+    def pop_keystate(self, key) -> bool | None:
+        """Pops a key from state"""
+        return self.__state.pop(key, None)
 
     def send_state(self):
         """Sends an acknowledge status to the server"""
-        logging.info("Send ack %s to MChS", self.isack)
+        logging.info("Send %s to MChS", "ACK" if self.isack else "NACK")
         logging.debug("MChS dict state %s", self.__state)
         MChSWorker.send(self.udp_ip, self.udp_port, self.client_id, self.isack)
         return

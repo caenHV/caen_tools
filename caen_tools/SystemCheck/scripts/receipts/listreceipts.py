@@ -24,19 +24,19 @@ class PreparedReceipts:
         )
 
     @staticmethod
-    def set_user_permission(sender: str, enable_user_set: bool) -> Receipt:
-        """Puts user permissions for setting voltage on the device"""
+    def get_voltage(sender: str) -> Receipt:
+        """Gets current voltage multiplier"""
 
-        logging.debug("Ask for receipt set_user_permission")
+        logging.debug("Current voltage multiplier")
         return Receipt(
             sender=sender,
             executor=Services.DEVBACK,
-            title="set_user_permission",
-            params={"enable_user_set": enable_user_set},
+            title="get_voltage",
+            params={},
         )
 
     @staticmethod
-    def get_params(sender: str) -> Receipt:
+    def get_params(sender: str, parameters: list | None = None) -> Receipt:
         """Gets parameters from device backend"""
 
         logging.debug("Ask for receipt devback/params")
@@ -44,7 +44,7 @@ class PreparedReceipts:
             sender=sender,
             executor=Services.DEVBACK,
             title="params",
-            params={},
+            params={"select_params": parameters},
         )
 
     @staticmethod
