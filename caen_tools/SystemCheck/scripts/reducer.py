@@ -40,9 +40,9 @@ class ReducerControl(Script):
         self.mchs = mchs
         self.relax = relax
 
-    @property
-    def interlock_status(self) -> bool:
-        return self.interlockdb.get_interlock.current_state
+    async def interlock_status(self) -> bool:
+        state = await self.interlockdb.get_interlock()
+        return state.current_state
 
     @property
     def target_voltage(self) -> float:
@@ -105,7 +105,7 @@ class ReducerControl(Script):
 
         starttime = timeit.default_timer()
 
-        if self.interlock_status:
+        if await self.interlock_status():
             self.form_answer(Codes.OK)
             return
 
@@ -129,8 +129,10 @@ class ReducerControl(Script):
             relax_params[0],
             relax_params[1],
         )
-        logging.error("VALS %s %s", relax.target_voltage, relax.voltage_modifier)
-        if self.interlock_status:
+        logging.error(
+            "VALS %s %s", self.relax.target_voltage, self.relax.voltage_modifier
+        )
+        if await self.interlock_status():
             logging.debug(
                 "ReducerControl: Interlock is up. No needs to restore voltage"
             )

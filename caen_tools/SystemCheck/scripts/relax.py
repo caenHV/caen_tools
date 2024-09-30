@@ -84,7 +84,8 @@ class RelaxControl(Script):
         target_voltage: float = self.target_voltage
         voltage_modifier: float = self.voltage_modifier
         reduced_voltage: float = target_voltage * voltage_modifier
-        interlock: bool = self.__interlockdb.get_interlock.current_state
+        current_interlock = await self.__interlockdb.get_interlock()
+        interlock: bool = current_interlock.current_state
 
         receipt = await self.cli.query(PreparedReceipts.get_voltage(self.SENDER))
         if isinstance(receipt.response, ReceiptResponseError):

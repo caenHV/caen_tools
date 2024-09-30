@@ -31,10 +31,10 @@ class InterlockControl(Script):
         starttime = timeit.default_timer()
 
         # 1. Get state
-        interlock = self.db.get_interlock
+        interlock = await self.db.get_interlock()
 
         # 2. Send state
-        self.mchs.set_state(nointerlock=not (interlock.current_state))
+        self.mchs.set_state(nointerlock=not interlock.current_state)
         self.mchs.send_state()
 
         exectime = timeit.default_timer() - starttime

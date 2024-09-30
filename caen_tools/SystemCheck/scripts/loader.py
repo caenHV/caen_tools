@@ -37,6 +37,10 @@ class LoaderControl(Script):
     def form_answer(self, code: Codes):
         self.shared_parameters["last_check"] = CheckResult(code)
 
+    def get_time(self, starttime):
+        """Utility method to get time difference"""
+        return timeit.default_timer() - starttime
+
     async def exec_function(self):
 
         starttime = timeit.default_timer()
@@ -48,6 +52,9 @@ class LoaderControl(Script):
             logging.error("No connection with DevBackend during LoaderControl")
             self.form_answer(Codes.DEVBACK_ERROR)
             return
+        logging.debug(
+            "LoaderControl: got devback params in %.3f", self.get_time(starttime)
+        )
 
         # 2. Put parameters into MON
         moncheck = await self.__cli.query(
@@ -57,6 +64,7 @@ class LoaderControl(Script):
             logging.error("No connection with Monitor during LoaderControl")
             self.form_answer(Codes.MONITOR_ERROR)
             return
+        logging.debug("LoaderControl: send to mon in %.3f", self.get_time(starttime))
 
         # 3. Finish
         self.form_answer(Codes.OK)
