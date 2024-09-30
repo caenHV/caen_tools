@@ -214,9 +214,9 @@ async def set_voltage(
         params={},
     )
     autopilot = await cli.query(autopilot, 1)
-    logging.error("AUTO %s", autopilot)
     if autopilot.response.statuscode == 1:
         if autopilot.response.body["interlock_follow"]:
+            logging.warning("Disabled set voltage (autopilot enabled): %s", autopilot)
             set_voltage.response = RResponseErrors.ForbiddenMethod(
                 msg="SetVoltage is not enabled (due to enabled autopilot)"
             )
@@ -271,7 +271,7 @@ async def device_params(sender: str = "webcli") -> Receipt:
     - **sender**: string identifier of the request sender
     """
 
-    logging.info("Start get device params cached function")
+    logging.debug("Start get device params cached function")
     receipt = Receipt(
         sender=sender,
         executor=Services.DEVBACK.title,
@@ -355,7 +355,7 @@ async def paramsdb(
     - **sender**: string identifier of the request sender
     """
 
-    logging.info("Start paramsdb task")
+    logging.info("Start montior/getparams task")
     stop_timestamp = get_timestamp() if stop_timestamp is None else stop_timestamp
     receipt = Receipt(
         sender=sender,

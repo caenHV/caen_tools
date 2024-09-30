@@ -19,7 +19,7 @@ class Script(ABC):
         return self.task is not None
 
     def start_ifnot(self) -> None:
-        """Starts a scenario loop if it not running yet"""
+        """Starts a script loop if it not running yet"""
 
         self.shared_parameters["enable"] = True
 
@@ -29,11 +29,11 @@ class Script(ABC):
 
         asyncio.create_task(self.on_start())
         self.task = asyncio.create_task(self.loop())
-        logging.info("Start scenario")
+        logging.debug("Start script")
         return
 
     def stop(self) -> None:
-        """Stops a scenario loop"""
+        """Stops a script loop"""
         if not self.isrunning:
             logging.debug("Script is already stopped. No need stop")
             return

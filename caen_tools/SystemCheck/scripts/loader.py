@@ -32,7 +32,7 @@ class LoaderControl(Script):
                 Services.MONITOR: monitor,
             }
         )
-        self.__parameters = ["VMon", "IMonH", "ChStatus", "ImonRange"]
+        self.__parameters = ["VMon", "IMonH", "IMonL", "ChStatus", "ImonRange"]
 
     def form_answer(self, code: Codes):
         self.shared_parameters["last_check"] = CheckResult(code)

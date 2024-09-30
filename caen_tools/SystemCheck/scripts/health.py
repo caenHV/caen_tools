@@ -42,7 +42,6 @@ class HealthControl(Script):
         )
         self.mchs = mchs
         self.dependent_scripts = stop_on_failure if stop_on_failure is not None else []
-        self.__imon_key = "IMonH"
         self.__max_currents = max_currents
 
     async def on_stop(self):
@@ -66,7 +65,9 @@ class HealthControl(Script):
             status = all(ch_status_good)
         except Exception as e:
             logging.warning("Can't check channels status. %s", e)
-        logging.info("Channel statuses are %s", "good" if status else "bad")
+
+        if not status:
+            logging.warning("Channel statuses are bad")
         return status
 
     def __check_currents(self, pars: dict) -> bool:
@@ -75,10 +76,12 @@ class HealthControl(Script):
             key = "volt_change" if int(st[1]) == 1 or int(st[2]) == 1 else "steady"
             return key
 
+        imon_key = lambda value: "IMonH" if value["ImonRange"] == 0 else "IMonL"
+
         status = False
         try:
             currents_status = [
-                val[self.__imon_key]
+                val[imon_key(val)]
                 < self.__max_currents[ch][max_current_key(val["ChStatus"])]
                 for ch, val in pars.items()
             ]
@@ -86,15 +89,21 @@ class HealthControl(Script):
         except KeyError as e:
             logging.warning("Can't find channel max current in config: %s", e)
             status = False
-        logging.info("Channel currents are %s", "good" if status else "bad")
+
+        if not status:
+            logging.warning("Channel currents are bad")
         return status
 
     def perform_checks(self, params_dict: dict) -> bool:
+        """All checks of the recieved parameters are here"""
+
         logging.debug("Perform parameters check: %s", params_dict)
 
         good_status = self.__check_ch_status(params_dict) and self.__check_currents(
             params_dict
         )
+        if not good_status:
+            logging.warning("Bad parameters found: %s", params_dict)
         return good_status
 
     def send_mchs(self, status: bool) -> None:
@@ -138,7 +147,9 @@ class HealthControl(Script):
         starttime = timeit.default_timer()
 
         devback_params = await self.cli.query(
-            PreparedReceipts.get_params(self.SENDER, [self.__imon_key, "ChStatus"])
+            PreparedReceipts.get_params(
+                self.SENDER, ["IMonH", "IMonL", "ImonRange", "ChStatus"]
+            )
         )
         if isinstance(devback_params.response, ReceiptResponseError):
             logging.warning("Error from DeviceBackend %s", devback_params.response)

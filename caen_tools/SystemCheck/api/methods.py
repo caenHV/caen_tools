@@ -13,9 +13,8 @@ class APIMethods:
     def status(receipt: Receipt, shared_parameters: dict, **kwargs) -> Receipt:
         """Gets status of the SysCheck"""
         logging.debug("Start status method")
-        logging.debug("SHA %s", shared_parameters)
-        logging.debug("SHA health %s", shared_parameters.get("health"))
-        logging.debug("SHA relax %s", shared_parameters.get("relax"))
+        logging.debug("Shared memory / health %s", shared_parameters.get("health"))
+        logging.debug("Shared memory / relax %s", shared_parameters.get("relax"))
         receipt.response = ReceiptResponse(
             statuscode=1,
             body=dict(
