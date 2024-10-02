@@ -73,7 +73,9 @@ class HealthControl(Script):
         def good_status(ch_status: str) -> tuple[bool, bool]:
             st = format(int(ch_status), "015b")[::-1][3:13]
             is_good = int(st) == 0
-            is_only_overvoltage = st[1] == "1" and st[0] == "0" and int(st[2:]) == 0
+            is_only_overvoltage = (
+                (st[1] == "1" or st[2] == "1") and st[0] == "0" and int(st[3:]) == 0
+            )
             return is_good, is_only_overvoltage
 
         status = False
@@ -91,7 +93,7 @@ class HealthControl(Script):
             is_only_overvoltage = (
                 len(bad_channels) != 0 and only_overvolt_channels == bad_channels
             )
-            logging.debug("Channel statuses: %s", ch_status_good)
+            logging.debug("Channel statuses (is_good, is_only_overvoltage): %s", ch_status_good)
         except Exception as e:
             logging.warning("Can't check channels status. %s", e)
 
