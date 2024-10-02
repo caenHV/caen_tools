@@ -1,7 +1,7 @@
 """Defines the Receipt and ReceiptResponse
 (microservices communicate using these objects)"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Union
 
 import json
@@ -14,7 +14,7 @@ class ReceiptResponse:
     """Defines a structure of the receipt response"""
 
     statuscode: int
-    body: Union[str, dict]
+    body: Union[str, dict, list]
     timestamp: int = None
 
     def __post_init__(self):

@@ -1,25 +1,21 @@
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 
-from caen_tools.MonitorService.SystemCheck import SystemCheck
-from caen_tools.ODB_handler.ODB_Handler import ODB_Handler
+from .ODB import ODB_Handler
 
 
 class Monitor:
-    def __init__(
-        self,
-        dbpath: str,
-        system_check: SystemCheck,
-        param_file_path: str,
-        interlock_db_uri: str
-    ):
-        self.__odb = ODB_Handler(dbpath, interlock_db_uri)
-        self.__system_check = system_check
+    def __init__(self, dbpath: str, param_file_path: str):
+        self.__odb = ODB_Handler(dbpath)
         self.__param_file_path = Path(param_file_path)
 
     @staticmethod
-    def __process_response(res_dict, measurement_time):
+    def __imon_key(val_ImonRange: int) -> str:
+        return "IMonH" if val_ImonRange == 0 else "IMonL"
+
+    def __process_response(self, res_dict, measurement_time):
         ts = measurement_time
 
         res = res_dict["params"]
@@ -27,7 +23,8 @@ class Monitor:
         res_list = []
         for chidx, val in res.items():
             status = int(bin(int(val["ChStatus"]))[2:])
-            res_list.append((chidx, val["VMon"], val["IMonH"], ts, status))
+            imon_key = self.__imon_key(int(val["ImonRange"]))
+            res_list.append((chidx, val["VMon"], val[imon_key], ts, status))
         return res_list
 
     def send_params(self, params: dict, measurement_time: int) -> dict:
@@ -47,34 +44,21 @@ class Monitor:
                 "is_ok" : True for ok and False if something is wrong.
             }
         """
-        cooked_res_list = Monitor.__process_response(params, measurement_time)
-        health_report = self.__system_check.check_params(params["params"])
+        logging.debug("Start sending parameters to ODB")
+        cooked_res_list = self.__process_response(params, measurement_time)
         is_ok = self.__odb.write_params(cooked_res_list, self.__param_file_path)
         response = {
             "timestamp": int(datetime.now().timestamp()),
             "is_ok": is_ok,
-            "system_health_report": health_report,
         }
         return response
 
     def get_params(self, start: int, end: int) -> dict:
+        logging.debug("Start getting parameters from ODB")
         res = self.__odb.get_params(start, end)
         response = {
             "timestamp": int(datetime.now().timestamp()),
             "is_ok": res is not None,
             "params": res,
         }
-        return response
-
-    def get_interlock(self) -> dict:
-        res = self.__system_check.check_interlock()
-        response = {
-            "timestamp": int(datetime.now().timestamp()),
-            "is_ok": res is not None,
-            "system_health_report": res,
-        }
-        return response
-
-    def is_ok(self) -> dict:
-        response = {"timestamp": int(datetime.now().timestamp()), "is_ok": True}
         return response

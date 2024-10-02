@@ -2,11 +2,9 @@
 
 import argparse
 import asyncio
-import json
 import logging
 
 from caen_tools.connection.server import RouterServer
-from caen_tools.MonitorService.SystemCheck import SystemCheck
 from caen_tools.MonitorService.monclass import Monitor
 from caen_tools.utils.receipt import Receipt, ReceiptResponse
 from caen_tools.utils.utils import config_processor, get_logging_config
@@ -33,12 +31,6 @@ async def process_message(dbs: RouterServer, monitor: Monitor) -> None:
     return
 
 
-def check_receipt(receipt: Receipt) -> bool:
-    """Check input receipt"""
-    is_executor = receipt.executor.lower() == "monitor"
-    return is_executor
-
-
 class APIMethods:
     """Contains implementations of the API methods
     of the microservice"""
@@ -46,22 +38,19 @@ class APIMethods:
     @staticmethod
     def status(receipt: Receipt, monitor: Monitor):
         """Returns status of the microservice"""
-        response = monitor.is_ok()
-        receipt.response = ReceiptResponse(
-            statuscode=1 if response["is_ok"] else 0, body={}
-        )
+        receipt.response = ReceiptResponse(statuscode=1, body={})
         return receipt
 
     @staticmethod
     def execute_send(receipt: Receipt, monitor: Monitor):
         """Sends device parameters in Monitor.
-        Monitor writes them in the DB and returns health report"""
+        Monitor writes them in the DB and returns {}"""
         response = monitor.send_params(
             receipt.params, measurement_time=receipt.timestamp
         )
         receipt.response = ReceiptResponse(
             statuscode=1 if response["is_ok"] else 0,
-            body=response["system_health_report"],
+            body={},
         )
         return receipt
 
@@ -82,20 +71,6 @@ class APIMethods:
         return receipt
 
     @staticmethod
-    def execute_get_interlock(receipt: Receipt, monitor: Monitor):
-        """Returns interlock status"""
-        response = monitor.get_interlock()
-        receipt.response = ReceiptResponse(
-            statuscode=1 if response["is_ok"] else 0,
-            body=(
-                response["system_health_report"]
-                if response["is_ok"]
-                else "Something is wrong in the DB. No rows selected."
-            ),
-        )
-        return receipt
-
-    @staticmethod
     def wrongroute(receipt: Receipt) -> Receipt:
         """Default answer for the wrong title field in the receipt"""
         receipt.response = ReceiptResponse(
@@ -109,15 +84,17 @@ class APIFactory:
         "status": APIMethods.status,
         "send_params": APIMethods.execute_send,
         "get_params": APIMethods.execute_get,
-        "get_interlock": APIMethods.execute_get_interlock,
     }
 
     @staticmethod
     def execute_receipt(receipt: Receipt, monitor: Monitor) -> Receipt:
         """Matches a function to execute input receipt"""
 
-        if receipt.title in APIFactory.apiroutes and check_receipt(receipt):
-            return APIFactory.apiroutes[receipt.title](receipt, monitor)
+        if receipt.title in APIFactory.apiroutes:
+            try:
+                return APIFactory.apiroutes[receipt.title](receipt, monitor)
+            except:
+                logging.error("Not processed %s", receipt, exc_info=True)
         return APIMethods.wrongroute(receipt)
 
 
@@ -137,10 +114,6 @@ def main():
     address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
     param_file_path = settings.get("monitor", "param_file_path")
-    interlock_db_uri = settings.get("monitor", "interlock_db_uri")
-    max_interlock_check_delta_time = int(
-        settings.get("monitor", "max_interlock_check_delta_time")
-    )
 
     get_logging_config(
         level=settings.get("monitor", "loglevel"),
@@ -151,8 +124,7 @@ def main():
         dict(settings.items("monitor")),
     )
 
-    system_check = SystemCheck(dbpath, interlock_db_uri, max_interlock_check_delta_time)
-    monitor = Monitor(dbpath, system_check, param_file_path, interlock_db_uri)
+    monitor = Monitor(dbpath, param_file_path)
 
     dbs = RouterServer(address, "monitor")
 

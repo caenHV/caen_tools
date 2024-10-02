@@ -1,5 +1,7 @@
 """Defines API methods for DeviceBackend microservice"""
 
+from functools import reduce
+
 import json
 import logging
 from caen_setup import Handler
@@ -58,8 +60,25 @@ class APIMethods:
         receipt.params must correspond SetVoltage_Ticket.type_description
         """
         logging.debug("Start set_voltage ticket")
+
         ticket = SetVoltage_Ticket(receipt.params)
         receipt.response = APIMethods.ticketexec(ticket, h)
+        return receipt
+
+    @staticmethod
+    def get_voltage(receipt: Receipt, h: Handler) -> Receipt:
+        """Returns current voltage multiplier"""
+
+        logging.debug("Start get_voltage multiplier")
+        ticket = GetParams_Ticket({"select_params": ["VSet", "VDef"]})
+        receipt.response = APIMethods.ticketexec(ticket, h)
+
+        rawdata = receipt.response.body["params"]
+        VDef = reduce(lambda x, y: x + y["params"]["VDef"], rawdata, 0)
+        VSet = reduce(lambda x, y: x + y["params"]["VSet"], rawdata, 0)
+        logging.debug("VSet = %s, VDef = %s", VSet, VDef)
+
+        receipt.response.body = dict(multiplier=VSet / VDef if VDef > 0 else None)
         return receipt
 
     @staticmethod
@@ -112,6 +131,7 @@ class APIFactory:
     apiroutes = {
         "status": APIMethods.status,
         "set_voltage": APIMethods.set_voltage,
+        "get_voltage": APIMethods.get_voltage,
         "params": APIMethods.params,
         "down": APIMethods.down,
     }
