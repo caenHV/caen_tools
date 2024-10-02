@@ -83,7 +83,7 @@ class HealthControl(Script):
             ch_status_good = {
                 ch: good_status(val["ChStatus"]) for ch, val in pars.items()
             }
-            bad_channels = [ch for ch, stat in ch_status_good.items() if stat[0]]
+            bad_channels = [ch for ch, stat in ch_status_good.items() if not stat[0]]
             only_overvolt_channels = [
                 ch for ch, stat in ch_status_good.items() if stat[1]
             ]
@@ -91,6 +91,7 @@ class HealthControl(Script):
             is_only_overvoltage = (
                 len(bad_channels) != 0 and only_overvolt_channels == bad_channels
             )
+            logging.debug("Channel statuses: %s", ch_status_good)
         except Exception as e:
             logging.warning("Can't check channels status. %s", e)
 
