@@ -5,7 +5,7 @@ A set of microservices implementating the CAEN management architecture
 ## Basic layout
 
 The scheme of microservices interaction looks like (the arrows display requests directions):
-![](./assets/scheme_v2.x.jpg)
+![](./scheme_v2.x.jpg)
 
 ## List of microservices
 

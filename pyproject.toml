@@ -2,12 +2,9 @@
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["caen_tools"]
-
 [project]
 name="caen-tools"
-version="2.2.6"
+version="2.2.7"
 requires-python=">=3.11"
 dependencies=[
     "pyzmq==25.1.1",
