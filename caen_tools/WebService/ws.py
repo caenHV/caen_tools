@@ -240,15 +240,7 @@ async def down(sender: Annotated[str, Body(embed=True)] = "webcli") -> Receipt:
     ----------
     - **sender**: string identifier of the request sender
     """
-
     logging.info("Start down voltage task")
-    down_voltage = Receipt(
-        sender=sender,
-        executor=Services.DEVBACK.title,
-        title="down",
-        params={},
-    )
-    down_resp = await cli.query(down_voltage)
 
     autopilot_off = Receipt(
         sender=sender,
@@ -257,6 +249,14 @@ async def down(sender: Annotated[str, Body(embed=True)] = "webcli") -> Receipt:
         params={"value": False, "target_voltage": 0},
     )
     autopilot_resp = await cli.query(autopilot_off, receive_time=1)
+
+    down_voltage = Receipt(
+        sender=sender,
+        executor=Services.DEVBACK.title,
+        title="down",
+        params={},
+    )
+    down_resp = await cli.query(down_voltage)
 
     return down_resp
 
