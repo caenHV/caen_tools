@@ -21,6 +21,7 @@ def run_worker(
     mon_address: str,
     interlock_db_uri: str,
     max_currents: dict,
+    ramp_down_trip_time: dict,
 ):
     """Worker running different scenarios for system control"""
 
@@ -43,6 +44,7 @@ def run_worker(
         mon_address,
         mchs,
         max_currents,
+        ramp_down_trip_time,
         [relax, reducer],
     )
 
