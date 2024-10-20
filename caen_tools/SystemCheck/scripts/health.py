@@ -55,8 +55,7 @@ class HealthControl(Script):
         self.shared_parameters["last_check"] = CheckResult(code)
         return
 
-    @staticmethod
-    def __check_ch_status(pars: dict) -> tuple[bool, bool]:
+    def __check_ch_status(self, pars: dict) -> bool:
         """Check channels statuses.
 
         Parameters
@@ -70,48 +69,21 @@ class HealthControl(Script):
             (is_status_ok, is_only_overvoltage)
         """
 
-        def good_status(ch_status: str) -> tuple[bool, bool]:
+        def good_status(ch_status: str) -> bool:
+            st = format(int(ch_status), "015b")[::-1][3:13]
+            return int(st) == 0
+
+        def is_only_over_under_voltage(ch_status: str) -> bool:
             st = format(int(ch_status), "015b")[::-1][3:13]
             is_good = int(st) == 0
             is_only_overvoltage = (
                 (st[1] == "1" or st[2] == "1") and st[0] == "0" and int(st[3:]) == 0
             )
-            return is_good, is_only_overvoltage
+            return is_only_overvoltage
 
-        status = False
-        bad_channels = []
-        only_overvolt_channels = []
-        try:
-            ch_status_good = {
-                ch: good_status(val["ChStatus"]) for ch, val in pars.items()
-            }
-            bad_channels = [ch for ch, stat in ch_status_good.items() if not stat[0]]
-            only_overvolt_channels = [
-                ch for ch, stat in ch_status_good.items() if stat[1]
-            ]
-            status = len(bad_channels) == 0
-            is_only_overvoltage = (
-                len(bad_channels) != 0 and only_overvolt_channels == bad_channels
-            )
-            logging.debug("Channel statuses (is_good, is_only_overvoltage): %s", ch_status_good)
-        except Exception as e:
-            logging.warning("Can't check channels status. %s", e)
-
-        if not status:
-            logging.warning(
-                f"Channels {bad_channels} statuses are bad. Channels {only_overvolt_channels} are in over voltage."
-            )
-        return status, is_only_overvoltage
-
-    def __trip_time_check(self, pars: dict) -> bool:
-        """Returns true if trip time is not exceeded."""
-
-        def check_status(ch_status: str) -> bool:
-            st = format(int(ch_status), "015b")[::-1][2]
-            return st == "1"
-
-        status = False
-        ch_trip_status: dict = {}
+        def is_rdown_status(ch_status: str) -> bool:
+            st = format(int(ch_status), "015b")[::-1]
+            return st[2] == "1"
 
         def check_time(info: RampDownInfo) -> bool:
             """If is_rdown time exceeds trip_time returns False, otherwise returns True."""
@@ -119,32 +91,58 @@ class HealthControl(Script):
                 return True
             return time.time() - info.timestamp < info.trip_time
 
+        status = False
+        bad_channels = []
+        only_over_under_volt_channels = []
+        ch_statuses = dict()
         try:
             for ch, val in pars.items():
-                new_status = check_status(val["ChStatus"])
-                prev_status = self.__rdown_info[ch].is_rdown
-                ch_status = True
+                ch_statuses[ch] = good_status(val["ChStatus"])
+                if not ch_statuses[ch]:
+                    bad_channels.append(ch)
+                if not ch_statuses[ch] and is_only_over_under_voltage(val["ChStatus"]):
+                    only_over_under_volt_channels.append(ch)
 
-                if new_status and not prev_status:
-                    self.__rdown_info[ch].is_rdown = True
-                    self.__rdown_info[ch].timestamp = time.time()
+                    if self.__rdown_info[ch].timestamp is None and is_rdown_status(
+                        val["ChStatus"]
+                    ):
+                        self.__rdown_info[ch].timestamp = time.time()
+                        self.__rdown_info[ch].last_breath = False
+                        self.__rdown_info[ch].is_rdown = True
 
-                if not new_status and prev_status:
-                    self.__rdown_info[ch].is_rdown = False
-                    self.__rdown_info[ch].timestamp = None
+                    if is_rdown_status(val["ChStatus"]):
+                        if check_time(self.__rdown_info[ch]):
+                            ch_statuses[ch] = True
+                        else:
+                            logging.warning(f"Channel {ch} exceeded trip time.")
+                        continue
 
-                if self.__rdown_info[ch].is_rdown:
-                    ch_status = check_time(self.__rdown_info[ch])
-                ch_trip_status[ch] = ch_status
+                    if self.__rdown_info[ch].is_rdown:
+                        self.__rdown_info[ch].is_rdown = False
+                        self.__rdown_info[ch].last_breath = True
+                        logging.warning(
+                            f"Channel {ch} is not in a ramp down but is in over/under voltage. It receives last breath trip time."
+                        )
 
-            status = all(ch_trip_status.values())
-            if not status:
-                logging.warning(
-                    f"Channels {[ch for ch, stat in ch_trip_status.items() if not stat]} exceeded trip time."
-                )
+                    if self.__rdown_info[ch].last_breath:
+                        if not check_time(self.__rdown_info[ch]):
+                            ch_statuses[ch] = False
+                            self.__rdown_info[ch].reset()
+                            logging.warning(f"Channel {ch} exceeded trip time.")
+                        else:
+                            ch_statuses[ch] = True
+
+                self.__rdown_info[ch].last_breath = False
+                self.__rdown_info[ch].timestamp = None
+
+            status = all(ch_statuses.values())
         except Exception as e:
-            logging.debug("Can't check ramp_down bit in channels status. %s", e)
+            logging.warning("Can't check channels status. %s", e)
 
+        if not status:
+            logging.warning(
+                f"Channels {bad_channels} statuses are bad. Channels {only_over_under_volt_channels} are in over/under voltage."
+            )
         return status
 
     def __check_currents(self, pars: dict) -> bool:
@@ -179,11 +177,8 @@ class HealthControl(Script):
 
         logging.debug("Perform parameters check: %s", params_dict)
 
-        is_trip_time_ok = self.__trip_time_check(params_dict)
-        is_status_ok, is_only_overvoltage = self.__check_ch_status(params_dict)
+        is_status_ok = self.__check_ch_status(params_dict)
         is_current_ok = self.__check_currents(params_dict)
-        if is_only_overvoltage and is_trip_time_ok:
-            is_status_ok = True
         good_status = is_status_ok and is_current_ok
 
         if not good_status:
