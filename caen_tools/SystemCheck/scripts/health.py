@@ -128,6 +128,7 @@ class HealthControl(Script):
                         self.__rdown_info[ch].is_rdown = False
                         self.__rdown_info[ch].last_breath = True
                         self.__rdown_info[ch].timestamp = time.time()
+                        ch_statuses[ch] = True
                         logging.warning(
                             f"Channel {ch} is not in a ramp down but is in over/under voltage. It receives last breath trip time."
                         )
