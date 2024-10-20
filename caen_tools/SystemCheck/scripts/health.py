@@ -117,13 +117,6 @@ class HealthControl(Script):
                             logging.warning(f"Channel {ch} exceeded trip time.")
                         continue
 
-                    if self.__rdown_info[ch].is_rdown:
-                        self.__rdown_info[ch].is_rdown = False
-                        self.__rdown_info[ch].last_breath = True
-                        logging.warning(
-                            f"Channel {ch} is not in a ramp down but is in over/under voltage. It receives last breath trip time."
-                        )
-
                     if self.__rdown_info[ch].last_breath:
                         if not check_time(self.__rdown_info[ch]):
                             ch_statuses[ch] = False
@@ -131,6 +124,13 @@ class HealthControl(Script):
                             logging.warning(f"Channel {ch} exceeded trip time.")
                         else:
                             ch_statuses[ch] = True
+                    else:
+                        self.__rdown_info[ch].is_rdown = False
+                        self.__rdown_info[ch].last_breath = True
+                        self.__rdown_info[ch].timestamp = time.time()
+                        logging.warning(
+                            f"Channel {ch} is not in a ramp down but is in over/under voltage. It receives last breath trip time."
+                        )
 
                 self.__rdown_info[ch].last_breath = False
                 self.__rdown_info[ch].timestamp = None
