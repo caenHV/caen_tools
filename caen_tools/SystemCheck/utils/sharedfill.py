@@ -10,6 +10,7 @@ from caen_tools.SystemCheck.scripts.structures import (
     HealthParametersDict,
     RelaxParamsDict,
     ReducerParametersDict,
+    RampGuardParametersDict,
     SharedParametersDict,
 )
 
@@ -72,12 +73,21 @@ def sharedmemo_fillup(
     )
     logging.debug("Reducer defaults: %s", reducer)
 
+    ramp_guard_section = f"{section}.autopilot.ramp_guard"
+    ramp_guard: RampGuardParametersDict = manager.dict(
+        enable=settings.getboolean(reducer_section, "enable"),
+        repeat_every=settings.getfloat(reducer_section, "repeat_every"),
+        last_check=None,
+    )
+    logging.debug("RampGuard defaults: %s", ramp_guard)
+
     shared_parameters = manager.dict(
         loader=loader,
         health=health,
         interlock=interlock,
         relax=relax,
         reducer=reducer,
+        ramp_guard=ramp_guard,
         mchs=mchs,
     )
 
