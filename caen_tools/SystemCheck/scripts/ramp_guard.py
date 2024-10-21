@@ -1,5 +1,4 @@
-"""ReducerControl: decreases and restores 
-the voltage at time intervals
+"""RampGuard: controls that MCHS is locked if some channels are in ramp up/down state. 
 """
 
 from typing import TypeAlias
@@ -88,7 +87,7 @@ class RampGuard(Script):
         self.send_mchs(not is_ramping)
 
         exectime = timeit.default_timer() - starttime
-        logging.info("ReducerControl was done in %.3f s", exectime)
+        logging.info("RampGuard was done in %.3f s", exectime)
 
     async def on_stop(self):
         self.mchs.pop_keystate(self.MCHS_KEY)
