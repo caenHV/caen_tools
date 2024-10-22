@@ -105,7 +105,6 @@ A simple service that verifies CAEN data from DeviceBackend in loop sends it in 
 | `target_voltage:float` | ReducerControl maintains target level of the voltage in normal situation | `${check.autopilot:voltage_modifier}` |
 | `voltage_modifier:float` | ReducerControl reduces voltage by this modifier during certain contitions | `${check.autopilot:target_voltage}` |
 
-
 **[check.mchs]** section
 * MChS general settings
 

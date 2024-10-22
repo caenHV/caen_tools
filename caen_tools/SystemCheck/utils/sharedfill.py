@@ -39,6 +39,7 @@ def sharedmemo_fillup(
     health: HealthParametersDict = manager.dict(
         enable=settings.getboolean(health_section, "enable"),
         repeat_every=settings.getfloat(health_section, "repeat_every"),
+        low_voltage_mlt=settings.getfloat(health_section, "low_voltage_mlt"),
         last_check=None,
     )
     logging.debug("Health defaults: %s", health)
