@@ -11,7 +11,6 @@ from caen_tools.SystemCheck.scripts import (
     HealthControl,
     RelaxControl,
     ReducerControl,
-    RampGuard,
 )
 from .utils import InterlockManager
 
@@ -39,7 +38,6 @@ def run_worker(
     reducer = ReducerControl(
         shared_parameters["reducer"], devback_address, interlockdb, mchs, relax
     )
-    ramp_guard = RampGuard(shared_parameters["ramp_guard"], devback_address, mchs)
     health = HealthControl(
         shared_parameters["health"],
         devback_address,
@@ -50,7 +48,7 @@ def run_worker(
         [relax, reducer],
     )
 
-    manager = ManagerScript([loader, interlock, relax, reducer, ramp_guard, health])
+    manager = ManagerScript([loader, interlock, relax, reducer, health])
 
     # Start manager and included scenarios
     loop = manager.start()

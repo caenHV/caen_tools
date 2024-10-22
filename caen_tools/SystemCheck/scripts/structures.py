@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import TypedDict
 from enum import Flag, auto
 
-from caen_tools.SystemCheck.scripts import ramp_guard
 from caen_tools.utils.utils import get_timestamp
 
 
@@ -79,10 +78,6 @@ class ReducerParametersDict(RelaxParamsDict):
     reducing_time: float
 
 
-class RampGuardParametersDict(RelaxParamsDict):
-    """Defines shared parameters dict structure for RampGuard script"""
-
-
 class SharedParametersDict(TypedDict):
     """Shared memory dictionary"""
 
@@ -91,5 +86,4 @@ class SharedParametersDict(TypedDict):
     interlock: InterlockParametersDict
     relax: RelaxParamsDict
     reducer: ReducerParametersDict
-    ramp_guard: ReducerParametersDict
     mchs: MCHSDict

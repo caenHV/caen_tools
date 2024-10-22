@@ -105,15 +105,6 @@ A simple service that verifies CAEN data from DeviceBackend in loop sends it in 
 | `target_voltage:float` | ReducerControl maintains target level of the voltage in normal situation | `${check.autopilot:voltage_modifier}` |
 | `voltage_modifier:float` | ReducerControl reduces voltage by this modifier during certain contitions | `${check.autopilot:target_voltage}` |
 
-**[check.autopilot.ramp_guard]** section
-* RampGuard (included in autopilot scripts group) settings (prevent DAQ if any channel is in ramp up/down state)
-
-| title | description | default value |
-|------|-----|-----|
-| `enable:bool` | enable/disable running this script by default | `${check.autopilot:enable}` |
-| `repeat_every:int` | script execution frequency (in seconds) | `1` |
-
-
 **[check.mchs]** section
 * MChS general settings
 

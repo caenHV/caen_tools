@@ -2,10 +2,12 @@
 of current parameters on CAEN device
 """
 
-import time
+from enum import IntEnum
+from functools import reduce
 from typing import TypeAlias
 
 import logging
+import time
 import timeit
 
 from caen_tools.connection.client import AsyncClient
@@ -18,6 +20,14 @@ from .receipts import Services, PreparedReceipts
 from ..utils import RampDownInfo
 
 Address: TypeAlias = str
+
+
+class CheckStatus(IntEnum):
+    """Statues of the performed check"""
+
+    ACK = 1
+    NACK = 2
+    FAILURE = 3
 
 
 class HealthControl(Script):
@@ -54,6 +64,42 @@ class HealthControl(Script):
     def form_answer(self, code: Codes) -> None:
         self.shared_parameters["last_check"] = CheckResult(code)
         return
+
+    def _check_ramping(self, pars: dict) -> bool:
+        """Checks that channels are not in ramp up/down state."""
+
+        def is_ramping_status(ch_status: str) -> bool:
+            st = format(int(ch_status), "015b")[::-1]
+            return st[1] == "1" or st[2] == "1"
+
+        is_ramping = False
+        try:
+            is_ramping = any(
+                [is_ramping_status(val["ChStatus"]) for val in pars.values()]
+            )
+        except KeyError as e:
+            logging.warning("RampGuard could not access ChStatus: %s", e)
+
+        if is_ramping:
+            logging.info("Ramping status detected")
+
+        return is_ramping
+
+    def _check_lowvolt(self, pars: dict) -> bool:
+        """Checks if current defined voltage multiplier level is lower of a limit"""
+
+        low_voltage_mlt: float = self.shared_parameters["low_voltage_mlt"]
+        cur_voltage_mlt: float = reduce(lambda x, y: x + y["VSet"], pars.values(), 0) / reduce(
+            lambda x, y: x + y["VDef"], pars.values(), 0
+        )
+
+        logging.debug(
+            "Is low voltage defined: %s (%.3f, %.3f)",
+            cur_voltage_mlt <= low_voltage_mlt,
+            cur_voltage_mlt,
+            low_voltage_mlt,
+        )
+        return cur_voltage_mlt <= low_voltage_mlt
 
     def __check_ch_status(self, pars: dict) -> bool:
         """Check channels statuses.
@@ -173,18 +219,26 @@ class HealthControl(Script):
             )
         return status
 
-    def perform_checks(self, params_dict: dict) -> bool:
+    def perform_checks(self, params_dict: dict) -> CheckStatus:
         """All checks of the recieved parameters are here"""
 
         logging.debug("Perform parameters check: %s", params_dict)
 
         is_status_ok = self.__check_ch_status(params_dict)
         is_current_ok = self.__check_currents(params_dict)
-        good_status = is_status_ok and is_current_ok
+        is_ramping = self._check_ramping(params_dict)
+        is_lowvolt = self._check_lowvolt(params_dict)
 
-        if not good_status:
-            logging.warning("Bad parameters found: %s", params_dict)
-        return good_status
+        good_device = is_status_ok and is_current_ok
+        unstable_params = is_ramping or is_lowvolt
+
+        if good_device and not unstable_params:
+            return CheckStatus.ACK
+        elif good_device and unstable_params:
+            return CheckStatus.NACK
+
+        logging.warning("Bad parameters found: %s", params_dict)
+        return CheckStatus.FAILURE
 
     def send_mchs(self, status: bool) -> None:
         """Sends ACK (True) or NACK (False) on MChS"""
@@ -228,7 +282,7 @@ class HealthControl(Script):
 
         devback_params = await self.cli.query(
             PreparedReceipts.get_params(
-                self.SENDER, ["IMonH", "IMonL", "ImonRange", "ChStatus"]
+                self.SENDER, ["IMonH", "IMonL", "ImonRange", "ChStatus", "VSet", "VDef"]
             )
         )
         if isinstance(devback_params.response, ReceiptResponseError):
@@ -237,13 +291,17 @@ class HealthControl(Script):
             return
 
         params_dict = devback_params.response.body["params"]
-        params_ok: bool = self.perform_checks(params_dict)
+        status: CheckStatus = self.perform_checks(params_dict)
 
-        if not params_ok:
-            await self.failure_actions()
-            return
-
-        self.send_mchs(True)
+        match status:
+            case CheckStatus.FAILURE:
+                await self.failure_actions()
+            case CheckStatus.ACK:
+                self.send_mchs(True)
+            case CheckStatus.NACK:
+                self.send_mchs(False)
+            case _:
+                logging.warning("This condition must not be met")
 
         exectime = timeit.default_timer() - starttime
         logging.info("HealthControl was done in %.3f s", exectime)

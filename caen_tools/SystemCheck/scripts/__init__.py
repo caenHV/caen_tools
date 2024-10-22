@@ -7,4 +7,3 @@ from .interlock import InterlockControl
 from .loader import LoaderControl
 from .reducer import ReducerControl
 from .relax import RelaxControl
-from .ramp_guard import RampGuard

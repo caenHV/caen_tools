@@ -42,7 +42,6 @@ class APIMethods:
                 interlock_follow=(
                     shared_parameters.get("relax").get("enable")
                     and shared_parameters.get("reducer").get("enable")
-                    and shared_parameters.get("ramp_guard").get("enable")
                 )
             ),
             timestamp=get_timestamp(),
@@ -56,7 +55,6 @@ class APIMethods:
         logging.info("Set interlock_follow to %s", receipt.params)
         shared_parameters["relax"]["enable"] = bool(receipt.params["value"])
         shared_parameters["reducer"]["enable"] = bool(receipt.params["value"])
-        shared_parameters["ramp_guard"]["enable"] = bool(receipt.params["value"])
 
         logging.info("new par %s", shared_parameters["interlock"]["enable"])
         shared_parameters["relax"]["target_voltage"] = float(
