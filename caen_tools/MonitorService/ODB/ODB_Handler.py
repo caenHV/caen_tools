@@ -6,7 +6,7 @@ import logging
 
 
 class ODB_Handler:
-    def __init__(self, dbpath: str, cleaning_frequency: int = 100):
+    def __init__(self, dbpath: str, cleaning_frequency: int = 1000):
         self.__dbpath = dbpath
 
         self.con = sqlite3.connect(self.__dbpath)
@@ -42,10 +42,11 @@ class ODB_Handler:
         tmp_path.rename(status_file_path)
 
     def clear_db(self):
-        min_timestamp = int((datetime.now() - timedelta(days=1)).timestamp())
+        min_timestamp = int((datetime.now() - timedelta(days=3)).timestamp())
         try:
             cur = self.con.cursor()
             cur.execute("DELETE FROM data WHERE t < ?", (min_timestamp,))
+            cur.execute("DELETE FROM status WHERE t < ?", (min_timestamp,))
             self.con.commit()
         except Exception as e:
             logging.warning(f"Can not delete old records from the DB: {e}")
