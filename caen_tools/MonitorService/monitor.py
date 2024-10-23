@@ -20,13 +20,13 @@ async def process_message(dbs: RouterServer, monitor: Monitor) -> None:
         asyncio.ensure_future(process_message(dbs, monitor))
 
         client_address, receipt = await dbs.recv_receipt()
-        logging.info("Received %s from %s", receipt.title, client_address)
+        logging.debug("Received %s from %s", receipt.title, client_address)
         logging.debug("Full receipt %s", receipt)
 
         out_receipt = APIFactory.execute_receipt(receipt, monitor)
 
         await dbs.send_receipt(client_address, out_receipt)
-        logging.info("send response to client %s", client_address)
+        logging.debug("send response to client %s", client_address)
 
     return
 
@@ -55,6 +55,21 @@ class APIMethods:
         return receipt
 
     @staticmethod
+    def execute_send_status(receipt: Receipt, monitor: Monitor):
+        """Sends device status in the Monitor.
+        Monitor writes them in the DB and returns {}"""
+        response = monitor.send_status(
+            receipt.params["is_ok"],
+            receipt.params["description"],
+            timestamp=receipt.timestamp,
+        )
+        receipt.response = ReceiptResponse(
+            statuscode=1 if response["is_ok"] else 0,
+            body={},
+        )
+        return receipt
+
+    @staticmethod
     def execute_get(receipt: Receipt, monitor: Monitor):
         """Gets device parameters from Monitor"""
         response = monitor.get_params(
@@ -64,6 +79,22 @@ class APIMethods:
             statuscode=1 if response["is_ok"] else 0,
             body=(
                 response["params"]
+                if response["is_ok"]
+                else "Something is wrong in the DB. No rows selected."
+            ),
+        )
+        return receipt
+
+    @staticmethod
+    def execute_get_status(receipt: Receipt, monitor: Monitor):
+        """Gets device status from the Monitor"""
+        response = monitor.get_status(
+            receipt.params["start_time"], receipt.params["end_time"]
+        )
+        receipt.response = ReceiptResponse(
+            statuscode=1 if response["is_ok"] else 0,
+            body=(
+                response["status"]
                 if response["is_ok"]
                 else "Something is wrong in the DB. No rows selected."
             ),
@@ -83,7 +114,9 @@ class APIFactory:
     apiroutes = {
         "status": APIMethods.status,
         "send_params": APIMethods.execute_send,
+        "send_status": APIMethods.execute_send_status,
         "get_params": APIMethods.execute_get,
+        "get_status": APIMethods.execute_get_status,
     }
 
     @staticmethod
@@ -114,6 +147,7 @@ def main():
     address = settings.get("monitor", "address")
     dbpath = settings.get("monitor", "dbpath")
     param_file_path = settings.get("monitor", "param_file_path")
+    status_file_path = settings.get("monitor", "status_file_path")
 
     get_logging_config(
         level=settings.get("monitor", "loglevel"),
@@ -124,7 +158,7 @@ def main():
         dict(settings.items("monitor")),
     )
 
-    monitor = Monitor(dbpath, param_file_path)
+    monitor = Monitor(dbpath, param_file_path, status_file_path)
 
     dbs = RouterServer(address, "monitor")
 
