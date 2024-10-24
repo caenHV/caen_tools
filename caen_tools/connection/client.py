@@ -151,7 +151,7 @@ class AsyncStreamClient(BaseClient):
                 answer = await sock.recv_multipart()
                 logging.debug("Received answer %s (from %s)", answer, connect_address)
             except zmq.error.Again:
-                logging.warning("No response from %s", connect_address)
+                logging.warning("No response from %s", connect_address, exc_info=True)
 
         s.setsockopt(zmq.LINGER, 0)
         s.close()
