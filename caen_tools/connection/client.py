@@ -105,3 +105,55 @@ class AsyncClient(BaseClient):
         s.close()
 
         return receipt_out
+
+
+class AsyncStreamClient(BaseClient):
+    """Async client class implementation (for STREAM sockets)
+
+    Parameters
+    ----------
+    receive_time: int, default 20
+        waiting time for server answer (in seconds)
+    """
+
+    def __init__(self, receive_time: int = 20):
+        logging.debug("Start AsyncStreamCli initialization")
+        context = zmq.asyncio.Context()
+        super().__init__(context, receive_time)
+
+    async def query(self, connect_address: str, message: bytes) -> list[bytes] | None:
+        """Sends a query to some address and receives the answer
+        
+        Parameters
+        ----------
+        connect_address: str
+            address like: "protocol://host:port"
+        message: bytes
+            sending message
+        
+        Returns
+        -------
+        list[bytes] | None
+            answer (None if not connected)
+        """
+
+        s = self.context.socket(zmq.STREAM)
+
+        with s.connect(connect_address) as sock:
+
+            id_sock = sock.getsockopt(zmq.IDENTITY)
+            await sock.send(id_sock, zmq.SNDMORE)
+            await sock.send(message)
+
+            answer = None
+            try:
+                _ = await sock.recv_multipart()
+                answer = await sock.recv_multipart()
+                logging.debug("Received answer %s (from %s)", answer, connect_address)
+            except zmq.error.Again:
+                logging.warning("No response from %s", connect_address, exc_info=True)
+
+        s.setsockopt(zmq.LINGER, 0)
+        s.close()
+
+        return answer
