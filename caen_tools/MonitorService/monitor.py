@@ -20,13 +20,13 @@ async def process_message(dbs: RouterServer, monitor: Monitor) -> None:
         asyncio.ensure_future(process_message(dbs, monitor))
 
         client_address, receipt = await dbs.recv_receipt()
-        logging.info("Received %s from %s", receipt.title, client_address)
+        logging.info("Received %s from %s", receipt.title, receipt.sender)
         logging.debug("Full receipt %s", receipt)
 
         out_receipt = APIFactory.execute_receipt(receipt, monitor)
 
         await dbs.send_receipt(client_address, out_receipt)
-        logging.info("send response to client %s", client_address)
+        logging.debug("send response to client %s", client_address)
 
     return
 
