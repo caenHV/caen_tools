@@ -68,3 +68,14 @@ class PreparedReceipts:
             title="send_params",
             params={"params": params},
         )
+
+    @staticmethod
+    def send_status2mon(sender: str, params: dict) -> Receipt:
+        """Sends the device status to monitor"""
+        logging.debug("Ask for receipt mon/send_status")
+        return Receipt(
+            sender=sender,
+            executor=Services.MONITOR,
+            title="send_status",
+            params={"params": params},
+        )
