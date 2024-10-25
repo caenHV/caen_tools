@@ -93,6 +93,8 @@ class LoaderDict(MinimalScriptDict):
 class HealthParametersDict(MinimalScriptDict):
     """Defines shared parameters dict structure for HealthParameters script"""
 
+    last_down: int | None
+
 
 class InterlockParametersDict(MinimalScriptDict):
     """Defines shared parameters dict structure for Interlock polling script"""

@@ -79,3 +79,14 @@ class PreparedReceipts:
             title="send_status",
             params={"params": params},
         )
+
+    @staticmethod
+    def get_last_downs(sender: str, params: dict) -> Receipt:
+        """Gets number of emergency downs from start_time to end_time from the monitor"""
+        logging.debug("Ask for receipt mon/get_last_downs")
+        return Receipt(
+            sender=sender,
+            executor=Services.MONITOR,
+            title="get_n_downs",
+            params={"params": params},
+        )

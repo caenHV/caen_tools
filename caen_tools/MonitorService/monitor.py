@@ -102,6 +102,22 @@ class APIMethods:
         return receipt
 
     @staticmethod
+    def execute_get_n_downs(receipt: Receipt, monitor: Monitor):
+        """Gets number of downs in the queried time window status from the Monitor"""
+        response = monitor.get_n_downs(
+            receipt.params["start_time"], receipt.params["end_time"]
+        )
+        receipt.response = ReceiptResponse(
+            statuscode=1 if response["is_ok"] else 0,
+            body=(
+                response["n_downs"]
+                if response["is_ok"]
+                else "Something is wrong in the DB. No rows selected."
+            ),
+        )
+        return receipt
+
+    @staticmethod
     def wrongroute(receipt: Receipt) -> Receipt:
         """Default answer for the wrong title field in the receipt"""
         receipt.response = ReceiptResponse(
@@ -117,6 +133,7 @@ class APIFactory:
         "send_status": APIMethods.execute_send_status,
         "get_params": APIMethods.execute_get,
         "get_status": APIMethods.execute_get_status,
+        "get_n_downs": APIMethods.execute_get_n_downs,
     }
 
     @staticmethod

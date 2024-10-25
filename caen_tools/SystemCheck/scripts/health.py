@@ -3,7 +3,6 @@ of current parameters on CAEN device
 """
 
 from functools import reduce
-from typing import TypeAlias
 
 import logging
 import time
@@ -298,14 +297,48 @@ class HealthControl(Script):
             )
             down_voltage = await self.cli.query(PreparedReceipts.down(self.SENDER))
             logging.info("Final response (%s)", down_voltage.response)
-
+        self.shared_parameters["last_down"] = time.time()
         await self.cli.query(
             PreparedReceipts.send_status2mon(
                 self.SENDER, {"is_ok": False, "description": status.failure[1]}  # type: ignore
-            ),
-            False,
+            )
         )
         return
+
+    async def check_and_restart(self):
+        end_time = time.time()
+        start_time = end_time - self.shared_parameters["allowed_down_window"]
+        get_n_downs = await self.cli.query(
+            PreparedReceipts.get_last_downs(
+                self.SENDER, {"start_time": start_time, "end_time": end_time}
+            )
+        )
+        if isinstance(get_n_downs.response, ReceiptResponseError):
+            logging.warning("Error from Monitor %s", get_n_downs.response)
+            self.form_answer(Codes.MONITOR_ERROR)
+            self.shared_parameters["last_down"] = None
+            self.shared_parameters["auto_restart"] = False
+            return
+
+        n_consecutive_downs = None
+        if get_n_downs.response.statuscode == 1:
+            n_consecutive_downs = int(get_n_downs.response.body)
+
+        if (
+            n_consecutive_downs is None
+            or n_consecutive_downs > self.shared_parameters["n_allowed_downs"]
+        ):
+            self.shared_parameters["last_down"] = None
+            self.shared_parameters["auto_restart"] = False
+
+        if (
+            self.shared_parameters["last_down"] is not None
+            and time.time() - self.shared_parameters["last_down"]
+            < self.shared_parameters["auto_restart_after"]
+        ):
+            for script in self.dependent_scripts:
+                script.start_ifnot()
+            self.shared_parameters["last_down"] = None
 
     async def exec_function(self):
         """Logic:
@@ -316,6 +349,9 @@ class HealthControl(Script):
             send NACK on mchs
             down voltage on setup
             turn off specified scripts
+            set last_down time
+        3. If enough time elapsed restarts dependent scripts (if auto_restart is on)
+
         """
         logging.debug("Start HealthControl script")
         starttime = timeit.default_timer()
@@ -337,6 +373,9 @@ class HealthControl(Script):
             await self.failure_actions(status)
         else:
             self.send_mchs(status.ack)
+
+        if self.shared_parameters["auto_restart"]:
+            await self.check_and_restart()
 
         exectime = timeit.default_timer() - starttime
         logging.info("HealthControl was done in %.3f s", exectime)
