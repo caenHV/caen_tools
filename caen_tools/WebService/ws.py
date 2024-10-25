@@ -11,7 +11,7 @@ import logging
 
 import uvicorn
 
-from fastapi import FastAPI, Body, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Body, Query, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -131,6 +131,7 @@ async def last_scream() -> None:
 
 
 @app.get("/")
+@app.get("/log")
 async def read_root():
     """Redirect on frontend page"""
     return FileResponse(os.path.join(root, "frontend", "build", "index.html"))
@@ -186,7 +187,9 @@ async def read_parameters(sender: str = "webcli") -> Receipt:
 @app.post(f"/{Services.DEVBACK.title}/set_voltage", tags=[Services.DEVBACK.title])
 @response_provider
 async def set_voltage(
-    target_voltage: Annotated[float, Body()], sender: Annotated[str, Body()] = "webcli"
+    background_tasks: BackgroundTasks,
+    target_voltage: Annotated[float, Body()],
+    sender: Annotated[str, Body()] = "webcli",
 ) -> Receipt:
     """[WS Backend API]
     Sets voltage on CAEN setup
@@ -225,12 +228,20 @@ async def set_voltage(
     logging.debug("Start setting voltage %s", target_voltage)
     set_voltage = await cli.query(set_voltage)
     logging.debug("Voltage set on %s", target_voltage)
+
+    message = f"Set voltage to {target_voltage:.4f} (by {sender})"
+    background_tasks.add_task(
+        writelog, message=message, critical_status=False, sender=sender
+    )
     return set_voltage
 
 
 @app.post(f"/{Services.DEVBACK.title}/down", tags=[Services.DEVBACK.title])
 @response_provider
-async def down(sender: Annotated[str, Body(embed=True)] = "webcli") -> Receipt:
+async def down(
+    background_tasks: BackgroundTasks,
+    sender: Annotated[str, Body(embed=True)] = "webcli",
+) -> Receipt:
     """[WS Backend API]
     Emergency call:
       Turns off voltage from CAEN device
@@ -258,6 +269,11 @@ async def down(sender: Annotated[str, Body(embed=True)] = "webcli") -> Receipt:
     )
     down_resp = await cli.query(down_voltage)
 
+
+    message = f"Down voltage (by {sender})"
+    background_tasks.add_task(
+        writelog, message=message, critical_status=True, sender=sender
+    )
     return down_resp
 
 
@@ -395,6 +411,79 @@ async def setparamsdb(
     resp = await cli.query(receipt)
     return resp
 
+@app.get(f"/{Services.MONITOR.title}/logs", tags=[Services.MONITOR.title])
+@response_provider
+async def getlogs(
+    start_timestamp: Annotated[int | None, Query()] = None,
+    stop_timestamp: Annotated[int | None, Query()] = None,
+    sender: Annotated[str, Query(max_length=50)] = "webcli",
+) -> Receipt:
+    """[WS Backend API]
+    Returns historical logs from the `monitor` microservice
+
+    Parameters
+    ----------
+    - **start_timestamp**:
+        start timestamp for data retrieval (in seconds),
+        default one day ago
+    - **stop_timestamp**:
+        stop timestamp for data retrieval (in seconds),
+        default current time
+    - **sender**:
+        string identifier of the request sender
+    """
+
+    logging.info("Logs requested by %s", sender)
+    one_day = 60 * 60 * 24
+    start_timestamp = get_timestamp() - one_day if start_timestamp is None else start_timestamp
+    stop_timestamp = get_timestamp() if stop_timestamp is None else stop_timestamp
+
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.MONITOR.title,
+        title="get_status",
+        params=dict(
+            start_time=start_timestamp,
+            end_time=stop_timestamp,
+        ),
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+@app.post(f"/{Services.MONITOR.title}/setlog", tags=[Services.MONITOR.title])
+@response_provider
+async def writelog(
+    message: Annotated[str, Query()],
+    critical_status: Annotated[bool, Query()] = False,
+    sender: Annotated[str, Query(max_length=50)] = "webcli",
+) -> Receipt:
+    """[WS Backend API]
+    Sends a message to `monitor` log
+
+    Parameters
+    ----------
+    - **message**: str
+        log message
+    - **critical_status**: bool, default False
+        critcal status of the log message
+    - **sender**: str
+        string identifier of the request sender
+    """
+
+    logging.info("Set log by %s", sender)
+
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.MONITOR.title,
+        title="send_status",
+        params=dict(
+            is_ok=not critical_status,
+            description=message,
+        ),
+    )
+    resp = await cli.query(receipt)
+    return resp
 
 # System check API routes
 
@@ -466,6 +555,7 @@ async def is_interlock_follow(
 )
 @response_provider
 async def set_interlock_follow(
+    background_tasks: BackgroundTasks,
     value: Annotated[bool, Body()],
     target_voltage: Annotated[float, Body()],
     sender: Annotated[str, Body(max_length=50)] = "webcli",
@@ -488,6 +578,12 @@ async def set_interlock_follow(
         params={"value": value, "target_voltage": target_voltage},
     )
     resp = await cli.query(receipt)
+
+    message = f"Turn on autopilot: target {target_voltage:.4f}" if value else "Turn off autopilot" 
+    message = f"{message} (by {sender})"
+    background_tasks.add_task(
+        writelog, message=message, critical_status=False, sender=sender
+    )
     return resp
 
 

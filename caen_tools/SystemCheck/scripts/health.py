@@ -259,6 +259,16 @@ class HealthControl(Script):
             )
             down_voltage = await self.cli.query(PreparedReceipts.down(self.SENDER))
             logging.info("Final response (%s)", down_voltage.response)
+
+        await self.cli.query(
+            PreparedReceipts.sendlog(
+                self.SENDER,
+                f"Down voltage due to bad device params (by {self.SENDER})",
+                True,
+            ),
+            receive_time=0.5,
+        )
+
         return
 
     async def exec_function(self):

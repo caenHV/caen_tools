@@ -68,3 +68,18 @@ class PreparedReceipts:
             title="send_params",
             params={"params": params},
         )
+
+    @staticmethod
+    def sendlog(sender: str, message: str, critical_status: bool) -> Receipt:
+        """Sends log message to monitor"""
+        logging.debug("Ask for mon/send_status")
+
+        return Receipt(
+            sender=sender,
+            executor=Services.MONITOR,
+            title="send_status",
+            params=dict(
+                is_ok=not critical_status,
+                description=message,
+            ),
+        )

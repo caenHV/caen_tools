@@ -84,7 +84,7 @@ class AsyncClient(BaseClient):
         connect_address = self.connect_addresses[receipt.executor]
 
         if receive_time is not None:
-            s.setsockopt(zmq.RCVTIMEO, receive_time * 1000)
+            s.setsockopt(zmq.RCVTIMEO, int(receive_time * 1000))
 
         with s.connect(connect_address) as sock:
             await sock.send_multipart([b"", receipt_str])
