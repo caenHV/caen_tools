@@ -40,6 +40,11 @@ def sharedmemo_fillup(
         enable=settings.getboolean(health_section, "enable"),
         repeat_every=settings.getfloat(health_section, "repeat_every"),
         low_voltage_mlt=settings.getfloat(health_section, "low_voltage_mlt"),
+        auto_restart=settings.getboolean(health_section, "auto_restart_autopilot"),
+        auto_restart_after=settings.getint(health_section, "auto_restart_after"),
+        allowed_down_window=settings.getint(health_section, "allowed_down_window"),
+        n_allowed_downs=settings.getint(health_section, "n_consecutive_downs"),
+        last_down=None,
         last_check=None,
     )
     logging.debug("Health defaults: %s", health)

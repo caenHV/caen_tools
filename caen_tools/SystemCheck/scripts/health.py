@@ -8,16 +8,19 @@ import logging
 import time
 import timeit
 
-from caen_tools.connection.client import AsyncClient
-from caen_tools.utils.receipt import ReceiptResponseError
 from caen_tools.SystemCheck.utils.structures import (
     Address,
+    CheckStatus,
+    RampDownInfo,
+    ErrorCode,
+    ErrorDescription,
     HealthParametersDict,
     CheckResult,
     Codes,
-    RampDownInfo,
-    CheckStatus,
 )
+
+from caen_tools.connection.client import AsyncClient
+from caen_tools.utils.receipt import ReceiptResponseError
 
 from .metascript import Script
 from .mchswork import MChSWorker
@@ -95,7 +98,9 @@ class HealthControl(Script):
         )
         return cur_voltage_mlt <= low_voltage_mlt
 
-    def __check_ch_status(self, pars: dict) -> bool:
+    def __check_ch_status(
+        self, pars: dict
+    ) -> tuple[bool, ErrorCode | None, ErrorDescription | None]:
         """Check channels statuses.
 
         Parameters
@@ -105,8 +110,9 @@ class HealthControl(Script):
 
         Returns
         -------
-        tuple[bool, bool]
-            (is_status_ok, is_only_overvoltage)
+        tuple[bool, ErrorCode | None, ErrorDescription | None]
+            (is_status_ok, code_of_error, status_description)
+           if is_status_ok == True code_of_error = None and status_description = None
         """
 
         def good_status(ch_status: str) -> bool:
@@ -115,7 +121,6 @@ class HealthControl(Script):
 
         def is_only_over_under_voltage(ch_status: str) -> bool:
             st = format(int(ch_status), "015b")[::-1][3:13]
-            is_good = int(st) == 0
             is_only_overvoltage = (
                 (st[1] == "1" or st[2] == "1") and st[0] == "0" and int(st[3:]) == 0
             )
@@ -132,6 +137,8 @@ class HealthControl(Script):
             return time.time() - info.timestamp < info.trip_time
 
         status = False
+        errCode = None
+        status_description = None
         bad_channels = []
         only_over_under_volt_channels = []
         ch_statuses = dict()
@@ -181,12 +188,18 @@ class HealthControl(Script):
             logging.warning("Can't check channels status. %s", e)
 
         if not status:
-            logging.warning(
-                f"Channels {bad_channels} statuses are bad. Channels {only_over_under_volt_channels} are in over/under voltage."
+            status_description = f"Channels {bad_channels} statuses are bad, of which {only_over_under_volt_channels} channels are in over/under voltage."
+            errCode = (
+                ErrorCode.BADVOLTAGE
+                if only_over_under_volt_channels == bad_channels
+                else ErrorCode.PARAMS
             )
-        return status
+            logging.warning(status_description)
+        return status, errCode, status_description
 
-    def __check_currents(self, pars: dict) -> bool:
+    def __check_currents(
+        self, pars: dict
+    ) -> tuple[bool, ErrorCode | None, ErrorDescription | None]:
         def max_current_key(ch_status: str) -> str:
             st = format(int(ch_status), "015b")[::-1][:13]
             key = "volt_change" if int(st[1]) == 1 or int(st[2]) == 1 else "steady"
@@ -195,6 +208,8 @@ class HealthControl(Script):
         imon_key = lambda value: "IMonH" if value["ImonRange"] == 0 else "IMonL"
 
         status = False
+        errCode = None
+        error_description = None
         currents_status = {}
         try:
             currents_status = {
@@ -203,23 +218,29 @@ class HealthControl(Script):
                 for ch, val in pars.items()
             }
             status = all(currents_status.values())
+            if not status:
+                errCode = ErrorCode.OVERCURRENT
+                error_description = f"Channels {[ch for ch, stat in currents_status.items() if not stat]} currents are bad."
+                logging.warning(error_description)
         except KeyError as e:
-            logging.warning("Can't find channel max current in config: %s", e)
+            errCode = ErrorCode.OVERCURRENT
+            error_description = f"Can't find channel max current in config: {e}"
+            logging.warning(error_description)
             status = False
 
-        if not status:
-            logging.warning(
-                f"Channels {[ch for ch, stat in currents_status.items() if not stat]} currents are bad."
-            )
-        return status
+        return status, errCode, error_description
 
     def perform_checks(self, params_dict: dict) -> CheckStatus:
         """All checks of the recieved parameters are here"""
 
         logging.debug("Perform parameters check: %s", params_dict)
 
-        is_status_ok = self.__check_ch_status(params_dict)
-        is_current_ok = self.__check_currents(params_dict)
+        is_status_ok, status_error_code, status_status_description = (
+            self.__check_ch_status(params_dict)
+        )
+        is_current_ok, current_error_code, current_status_description = (
+            self.__check_currents(params_dict)
+        )
         is_ramping = self._check_ramping(params_dict)
         is_lowvolt = self._check_lowvolt(params_dict)
 
@@ -227,12 +248,23 @@ class HealthControl(Script):
         unstable_params = is_ramping or is_lowvolt
 
         if good_device and not unstable_params:
-            return CheckStatus.ACK
+            return CheckStatus(ack=True)
         elif good_device and unstable_params:
-            return CheckStatus.NACK
+            return CheckStatus(ack=False)
 
         logging.warning("Bad parameters found: %s", params_dict)
-        return CheckStatus.FAILURE
+        if not is_status_ok and not is_current_ok:
+            return CheckStatus(
+                ack=False, failure=(current_error_code, current_status_description)  # type: ignore
+            )
+        if not is_status_ok and is_current_ok:
+            return CheckStatus(
+                ack=False, failure=(status_error_code, status_status_description)  # type: ignore
+            )
+        else:
+            return CheckStatus(
+                ack=False, failure=(current_error_code, current_status_description)  # type: ignore
+            )
 
     def send_mchs(self, status: bool) -> None:
         """Sends ACK (True) or NACK (False) on MChS"""
@@ -240,7 +272,7 @@ class HealthControl(Script):
         self.mchs.send_state()
         return
 
-    async def failure_actions(self) -> None:
+    async def failure_actions(self, status: CheckStatus) -> None:
         """A number of actions on failure"""
 
         logging.error("Bad deivce parameters. Emergency DownVoltage!")
@@ -253,6 +285,12 @@ class HealthControl(Script):
 
         logging.debug("Send Down Voltage Receipt")
         down_voltage = await self.cli.query(PreparedReceipts.down(self.SENDER))
+        logging.info(
+            "Send emergency status of the device: is_ok = %s, description = %s",
+            False,
+            status.failure[1],  # type: ignore
+        )
+
         if isinstance(down_voltage.response, ReceiptResponseError):
             logging.error(
                 "Not sent DownVoltage Receipt (%s)! Try again...", down_voltage.response
@@ -260,6 +298,7 @@ class HealthControl(Script):
             down_voltage = await self.cli.query(PreparedReceipts.down(self.SENDER))
             logging.info("Final response (%s)", down_voltage.response)
 
+        self.shared_parameters["last_down"] = time.time()
         await self.cli.query(
             PreparedReceipts.sendlog(
                 self.SENDER,
@@ -271,6 +310,41 @@ class HealthControl(Script):
 
         return
 
+    async def check_and_restart(self):
+        end_time = time.time()
+        start_time = end_time - self.shared_parameters["allowed_down_window"]
+        get_n_downs = await self.cli.query(
+            PreparedReceipts.get_last_downs(
+                self.SENDER, start_time=start_time, end_time=end_time
+            )
+        )
+        if isinstance(get_n_downs.response, ReceiptResponseError):
+            logging.warning("Error from Monitor %s", get_n_downs.response)
+            self.form_answer(Codes.MONITOR_ERROR)
+            self.shared_parameters["last_down"] = None
+            self.shared_parameters["auto_restart"] = False
+            return
+
+        n_consecutive_downs = None
+        if get_n_downs.response.statuscode == 1:
+            n_consecutive_downs = int(get_n_downs.response.body)
+
+        if (
+            n_consecutive_downs is None
+            or n_consecutive_downs > self.shared_parameters["n_allowed_downs"]
+        ):
+            self.shared_parameters["last_down"] = None
+            self.shared_parameters["auto_restart"] = False
+
+        if (
+            self.shared_parameters["last_down"] is not None
+            and time.time() - self.shared_parameters["last_down"]
+            < self.shared_parameters["auto_restart_after"]
+        ):
+            for script in self.dependent_scripts:
+                script.start_ifnot()
+            self.shared_parameters["last_down"] = None
+
     async def exec_function(self):
         """Logic:
         1. Get parameters from CAEN device
@@ -280,6 +354,9 @@ class HealthControl(Script):
             send NACK on mchs
             down voltage on setup
             turn off specified scripts
+            set last_down time
+        3. If enough time elapsed restarts dependent scripts (if auto_restart is on)
+
         """
         logging.debug("Start HealthControl script")
         starttime = timeit.default_timer()
@@ -297,15 +374,13 @@ class HealthControl(Script):
         params_dict = devback_params.response.body["params"]
         status: CheckStatus = self.perform_checks(params_dict)
 
-        match status:
-            case CheckStatus.FAILURE:
-                await self.failure_actions()
-            case CheckStatus.ACK:
-                self.send_mchs(True)
-            case CheckStatus.NACK:
-                self.send_mchs(False)
-            case _:
-                logging.warning("This condition must not be met")
+        if status.failure is not None:
+            await self.failure_actions(status)
+        else:
+            self.send_mchs(status.ack)
+
+        if self.shared_parameters["auto_restart"]:
+            await self.check_and_restart()
 
         exectime = timeit.default_timer() - starttime
         logging.info("HealthControl was done in %.3f s", exectime)

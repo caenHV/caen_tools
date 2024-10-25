@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import TypeAlias, TypedDict
-from enum import IntEnum, Flag, auto
+from enum import Enum, Flag, auto
 
 from caen_tools.utils.utils import get_timestamp
 
@@ -16,12 +16,21 @@ class Codes(Flag):
     MONITOR_ERROR = auto()
 
 
-class CheckStatus(IntEnum):
-    """Statues of the performed health check"""
+class ErrorCode(Enum):
+    OVERCURRENT = 1
+    BADVOLTAGE = 2
+    PARAMS = 3
 
-    ACK = 1
-    NACK = 2
-    FAILURE = 3
+
+ErrorDescription: TypeAlias = str
+
+
+@dataclass
+class CheckStatus:
+    """Statues of the performed check"""
+
+    ack: bool
+    failure: tuple[ErrorCode, ErrorDescription] | None = None
 
 
 @dataclass
@@ -83,6 +92,8 @@ class LoaderDict(MinimalScriptDict):
 
 class HealthParametersDict(MinimalScriptDict):
     """Defines shared parameters dict structure for HealthParameters script"""
+
+    last_down: int | None
 
 
 class InterlockParametersDict(MinimalScriptDict):

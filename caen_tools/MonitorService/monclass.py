@@ -104,11 +104,24 @@ class Monitor:
         return response
 
     def get_status(self, start: int, end: int) -> dict:
-        logging.debug("Start getting parameters from ODB")
+        logging.debug("Start getting statuses from ODB")
         res = self.__odb.get_status(start, end)
         response = {
             "timestamp": int(datetime.now().timestamp()),
             "is_ok": res is not None,
             "status": res,
+        }
+        return response
+
+    def get_n_downs(self, start: int, end: int) -> dict:
+        logging.debug("Start getting statuses from ODB")
+        res = self.__odb.get_status(start, end)
+        n_downs = -1
+        if res is not None:
+            n_downs = len([stat for stat in res if stat["is_ok"] == False])
+        response = {
+            "timestamp": int(datetime.now().timestamp()),
+            "is_ok": res is not None,
+            "n_downs": n_downs,
         }
         return response

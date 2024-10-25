@@ -72,7 +72,7 @@ class PreparedReceipts:
     @staticmethod
     def sendlog(sender: str, message: str, critical_status: bool) -> Receipt:
         """Sends log message to monitor"""
-        logging.debug("Ask for mon/send_status")
+        logging.debug("Ask for receipt mon/send_status")
 
         return Receipt(
             sender=sender,
@@ -81,5 +81,19 @@ class PreparedReceipts:
             params=dict(
                 is_ok=not critical_status,
                 description=message,
+            ),
+        )
+
+    @staticmethod
+    def get_last_downs(sender: str, start_time: int, end_time: int) -> Receipt:
+        """Gets number of emergency downs from start_time to end_time from the monitor"""
+        logging.debug("Ask for receipt mon/get_last_downs")
+        return Receipt(
+            sender=sender,
+            executor=Services.MONITOR,
+            title="get_n_downs",
+            params=dict(
+                start_time=int(start_time),
+                end_time=int(end_time),
             ),
         )
