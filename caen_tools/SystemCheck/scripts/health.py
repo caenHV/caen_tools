@@ -2,9 +2,7 @@
 of current parameters on CAEN device
 """
 
-from enum import IntEnum
 from functools import reduce
-from typing import TypeAlias
 
 import logging
 import time
@@ -12,22 +10,18 @@ import timeit
 
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.receipt import ReceiptResponseError
+from caen_tools.SystemCheck.utils.structures import (
+    Address,
+    HealthParametersDict,
+    CheckResult,
+    Codes,
+    RampDownInfo,
+    CheckStatus,
+)
 
 from .metascript import Script
 from .mchswork import MChSWorker
-from .structures import HealthParametersDict, CheckResult, Codes
 from .receipts import Services, PreparedReceipts
-from ..utils import RampDownInfo
-
-Address: TypeAlias = str
-
-
-class CheckStatus(IntEnum):
-    """Statues of the performed check"""
-
-    ACK = 1
-    NACK = 2
-    FAILURE = 3
 
 
 class HealthControl(Script):
@@ -89,9 +83,9 @@ class HealthControl(Script):
         """Checks if current defined voltage multiplier level is lower of a limit"""
 
         low_voltage_mlt: float = self.shared_parameters["low_voltage_mlt"]
-        cur_voltage_mlt: float = reduce(lambda x, y: x + y["VSet"], pars.values(), 0) / reduce(
-            lambda x, y: x + y["VDef"], pars.values(), 0
-        )
+        cur_voltage_mlt: float = reduce(
+            lambda x, y: x + y["VSet"], pars.values(), 0
+        ) / reduce(lambda x, y: x + y["VDef"], pars.values(), 0)
 
         logging.debug(
             "Is low voltage defined: %s (%.3f, %.3f)",

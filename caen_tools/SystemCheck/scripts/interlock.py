@@ -5,8 +5,9 @@ import timeit
 import logging
 
 from caen_tools.SystemCheck.utils.interlockdb import InterlockManager
+from caen_tools.SystemCheck.utils.structures import InterlockParametersDict
+
 from .metascript import Script
-from .structures import InterlockParametersDict
 from .mchswork import MChSWorker
 
 

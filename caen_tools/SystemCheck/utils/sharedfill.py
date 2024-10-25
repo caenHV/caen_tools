@@ -3,7 +3,7 @@
 import logging
 import multiprocessing as mp
 
-from caen_tools.SystemCheck.scripts.structures import (
+from .structures import (
     MCHSDict,
     LoaderDict,
     InterlockParametersDict,

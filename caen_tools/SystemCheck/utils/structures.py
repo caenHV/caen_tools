@@ -1,8 +1,11 @@
 from dataclasses import dataclass
-from typing import TypedDict
-from enum import Flag, auto
+from typing import TypeAlias, TypedDict
+from enum import IntEnum, Flag, auto
 
 from caen_tools.utils.utils import get_timestamp
+
+# Alias for microservice connection_address "proto://host:port"
+Address: TypeAlias = str
 
 
 class Codes(Flag):
@@ -11,6 +14,14 @@ class Codes(Flag):
     OK = auto()
     DEVBACK_ERROR = auto()
     MONITOR_ERROR = auto()
+
+
+class CheckStatus(IntEnum):
+    """Statues of the performed health check"""
+
+    ACK = 1
+    NACK = 2
+    FAILURE = 3
 
 
 @dataclass
@@ -23,6 +34,19 @@ class InterlockState:
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = get_timestamp()
+
+
+@dataclass
+class RampDownInfo:
+    is_rdown: bool
+    trip_time: float
+    timestamp: float | None = None
+    last_breath: bool = False
+
+    def reset(self) -> None:
+        self.is_rdown = False
+        self.timestamp = None
+        self.last_breath = False
 
 
 class MCHSDict(TypedDict):

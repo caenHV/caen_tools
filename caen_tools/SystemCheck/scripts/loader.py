@@ -1,17 +1,20 @@
 """Loader Control: gets data from device backend 
 and sends it to Monitor (for ODB writing)"""
 
-from typing import TypeAlias
 import timeit
 import logging
 
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.receipt import ReceiptResponseError
-from .structures import LoaderDict, Codes, CheckResult
+from caen_tools.SystemCheck.utils.structures import (
+    Address,
+    LoaderDict,
+    Codes,
+    CheckResult,
+)
+
 from .metascript import Script
 from .receipts import Services, PreparedReceipts
-
-Address: TypeAlias = str
 
 
 class LoaderControl(Script):

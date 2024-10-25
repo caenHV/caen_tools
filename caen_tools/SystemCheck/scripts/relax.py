@@ -4,21 +4,22 @@ And restore voltage level when flag is down
 """
 
 from math import isclose
-from typing import TypeAlias
 
 import logging
 import timeit
 
 from caen_tools.connection.client import AsyncClient
-from caen_tools.utils.utils import get_timestamp
 from caen_tools.SystemCheck.utils import InterlockManager
 from caen_tools.utils.receipt import ReceiptResponseError
+from caen_tools.SystemCheck.utils.structures import (
+    Address,
+    RelaxParamsDict,
+    Codes,
+    CheckResult,
+)
 
 from .metascript import Script
-from .structures import InterlockState, RelaxParamsDict, Codes, CheckResult
 from .receipts import PreparedReceipts, Services
-
-Address: TypeAlias = str
 
 
 class RelaxControl(Script):

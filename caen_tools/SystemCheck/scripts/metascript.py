@@ -4,7 +4,7 @@ import asyncio
 import timeit
 import logging
 
-from .structures import MinimalScriptDict
+from caen_tools.SystemCheck.utils.structures import MinimalScriptDict
 
 
 class Script(ABC):

@@ -2,22 +2,24 @@
 the voltage at time intervals
 """
 
-from typing import TypeAlias
-
 import asyncio
 import logging
 import timeit
 
 from caen_tools.connection.client import AsyncClient
-from caen_tools.SystemCheck.utils import InterlockManager
 from caen_tools.utils.receipt import ReceiptResponseError
+from caen_tools.SystemCheck.utils import InterlockManager
+from caen_tools.SystemCheck.utils.structures import (
+    Address,
+    ReducerParametersDict,
+    Codes,
+    CheckResult,
+)
+
 from .metascript import Script
-from .structures import ReducerParametersDict, Codes, CheckResult
 from .receipts import Services, PreparedReceipts
 from .mchswork import MChSWorker
 from .relax import RelaxControl
-
-Address: TypeAlias = str
 
 
 class ReducerControl(Script):

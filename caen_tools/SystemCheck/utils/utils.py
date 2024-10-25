@@ -1,7 +1,8 @@
-from dataclasses import dataclass
 from pathlib import Path
 import json
 import logging
+
+from .structures import RampDownInfo
 
 
 def parse_max_currents(health_config_path: Path) -> dict:
@@ -19,19 +20,6 @@ def parse_max_currents(health_config_path: Path) -> dict:
         raise e
 
     return max_currents_map
-
-
-@dataclass
-class RampDownInfo:
-    is_rdown: bool
-    trip_time: float
-    timestamp: float | None = None
-    last_breath: bool = False
-
-    def reset(self) -> None:
-        self.is_rdown = False
-        self.timestamp = None
-        self.last_breath = False
 
 
 def fill_ramp_down_info(trip_time_map: dict) -> dict[str, RampDownInfo] | None:

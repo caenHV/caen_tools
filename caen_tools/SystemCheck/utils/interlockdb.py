@@ -4,7 +4,7 @@ import logging
 
 import psycopg
 from caen_tools.connection.client import AsyncStreamClient
-from caen_tools.SystemCheck.scripts.structures import InterlockState
+from .structures import InterlockState
 
 
 class InterlockManager:
@@ -64,7 +64,7 @@ class InterlockManager:
         """Pulls interlock state from socket"""
 
         message = bytes(
-            rf"n:{self._db_credentials['dbname']}|m:get\n", encoding="UTF-8"
+            f"n:{self._db_credentials['dbname']}|m:get\n", encoding="UTF-8"
         )
         logging.debug("Pull interlock from socket (message: %s)", message)
         result = await self._cli.query(
