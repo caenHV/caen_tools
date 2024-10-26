@@ -86,10 +86,6 @@ class MinimalScriptDict(TypedDict):
     last_check: CheckResult | None
 
 
-class LoaderDict(MinimalScriptDict):
-    """Loader script config structure"""
-
-
 class HealthParametersDict(MinimalScriptDict):
     """Defines shared parameters dict structure for HealthParameters script"""
 
@@ -116,7 +112,6 @@ class ReducerParametersDict(RelaxParamsDict):
 class SharedParametersDict(TypedDict):
     """Shared memory dictionary"""
 
-    loader: LoaderDict
     health: HealthParametersDict
     interlock: InterlockParametersDict
     relax: RelaxParamsDict

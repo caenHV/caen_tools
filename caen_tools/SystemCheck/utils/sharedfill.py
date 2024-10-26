@@ -5,7 +5,6 @@ import multiprocessing as mp
 
 from .structures import (
     MCHSDict,
-    LoaderDict,
     InterlockParametersDict,
     HealthParametersDict,
     RelaxParamsDict,
@@ -26,14 +25,6 @@ def sharedmemo_fillup(
         client_id=settings.get(mchs_section, "client_id"),
     )
     logging.debug("MChS defaults: %s", mchs)
-
-    loader_section = f"{section}.loader"
-    loader: LoaderDict = manager.dict(
-        enable=settings.getboolean(loader_section, "enable"),
-        repeat_every=settings.getfloat(loader_section, "repeat_every"),
-        last_check=None,
-    )
-    logging.debug("Loader defaults: %s", loader)
 
     health_section = f"{section}.health"
     health: HealthParametersDict = manager.dict(
@@ -79,7 +70,6 @@ def sharedmemo_fillup(
     logging.debug("Reducer defaults: %s", reducer)
 
     shared_parameters = manager.dict(
-        loader=loader,
         health=health,
         interlock=interlock,
         relax=relax,

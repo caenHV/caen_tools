@@ -26,7 +26,7 @@ def worker(device_backend: Address, monitor: Address, period: float):
     except KeyboardInterrupt:
         logging.info("Keyboard Interrupt. Finish the program")
     finally:
-        logging.info("Final program close", exc_info=True)
+        logging.info("Final program close")
         loader.close()
 
     return

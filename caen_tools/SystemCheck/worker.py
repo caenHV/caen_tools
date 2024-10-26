@@ -6,7 +6,6 @@ import logging
 from caen_tools.SystemCheck.scripts import (
     ManagerScript,
     MChSWorker,
-    LoaderControl,
     InterlockControl,
     HealthControl,
     RelaxControl,
@@ -32,7 +31,6 @@ def run_worker(
     interlockdb = InterlockManager(interlock_db_uri)
 
     # A number of running scripts
-    loader = LoaderControl(shared_parameters["loader"], devback_address, mon_address)
     interlock = InterlockControl(shared_parameters["interlock"], interlockdb, mchs)
     relax = RelaxControl(shared_parameters["relax"], devback_address, interlockdb)
     reducer = ReducerControl(
@@ -48,7 +46,7 @@ def run_worker(
         [relax, reducer],
     )
 
-    manager = ManagerScript([loader, interlock, relax, reducer, health])
+    manager = ManagerScript([interlock, relax, reducer, health])
 
     # Start manager and included scenarios
     loop = manager.start()

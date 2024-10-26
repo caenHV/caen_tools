@@ -69,7 +69,7 @@ class LoaderControl:
         return
 
     def _form_answer(self, code: Codes):
-        logging.info("OK, YOU'RE HERE %s", code)
+        logging.debug("Loader last status is %s", code)
         return
 
     async def _exec_function(self):
