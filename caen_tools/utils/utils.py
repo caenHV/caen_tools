@@ -1,7 +1,9 @@
 """Small utility helpful functions"""
 
+from argparse import Namespace
 from pathlib import Path
 
+import argparse
 import configparser
 import time
 import logging
@@ -106,3 +108,25 @@ def get_logging_config(
     )
     logging.debug("Set logging settings")
     return
+
+
+def argparser(description: str) -> Namespace:
+    """Default console argparser
+
+    Parameters
+    ----------
+    description: str
+        argparser description
+    """
+
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument(
+        "-c",
+        "--config",
+        required=False,
+        type=argparse.FileType("r"),
+        help="Config file path",
+        nargs="?",
+    )
+    args = parser.parse_args()
+    return args

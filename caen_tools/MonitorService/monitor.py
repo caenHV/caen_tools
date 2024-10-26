@@ -1,200 +1,62 @@
-"""Monitor microservice"""
+"""Monitor microservice entry point"""
 
-import argparse
-import asyncio
 import logging
+import multiprocessing as mp
 
-from caen_tools.connection.server import RouterServer
-from caen_tools.MonitorService.monclass import Monitor
-from caen_tools.utils.receipt import Receipt, ReceiptResponse
-from caen_tools.utils.utils import config_processor, get_logging_config
+from caen_tools.utils.utils import argparser, config_processor, get_logging_config
+from caen_tools.MonitorService.utils import graceful_shutdown
+from .api import server
+from .worker import worker
 
-NUM_ASYNC_TASKS = 5
-sem = asyncio.Semaphore(NUM_ASYNC_TASKS)
+CONFIG_SECTION = "monitor"
 
 
-async def process_message(dbs: RouterServer, monitor: Monitor) -> None:
-    """Processes one input message"""
+def main():
+    """Monitor microservice entry point"""
 
-    async with sem:
-        asyncio.ensure_future(process_message(dbs, monitor))
+    console_args = argparser("Monitor microservice")
+    settings = config_processor(console_args.config)
 
-        client_address, receipt = await dbs.recv_receipt()
-        logging.debug("Received %s from %s", receipt.title, receipt.sender)
-        logging.debug("Full receipt %s", receipt)
+    get_logging_config(
+        level=settings.get(CONFIG_SECTION, "loglevel"),
+        filepath=settings.get(CONFIG_SECTION, "logfile"),
+    )
 
-        out_receipt = APIFactory.execute_receipt(receipt, monitor)
+    logging.info(
+        "Start Monitor with arguments %s", dict(settings.items(CONFIG_SECTION))
+    )
 
-        await dbs.send_receipt(client_address, out_receipt)
-        logging.debug("send response to client %s", client_address)
+    worker_process = mp.Process(
+        target=worker,
+        args=(
+            settings.get(CONFIG_SECTION, "device_backend"),
+            settings.get(CONFIG_SECTION, "monitor"),
+            settings.getfloat(CONFIG_SECTION, "update_period"),
+        ),
+    )
+    server_process = mp.Process(
+        target=server,
+        args=(
+            settings.get(CONFIG_SECTION, "address"),
+            settings.get(CONFIG_SECTION, "dbpath"),
+            settings.get(CONFIG_SECTION, "param_file_path"),
+            settings.get(CONFIG_SECTION, "status_file_path"),
+        ),
+        daemon=True,
+    )
+
+    try:
+        worker_process.start()
+        server_process.start()
+        worker_process.join()
+        server_process.join()
+    except KeyboardInterrupt:
+        logging.info("Shutdown due to keyboard interrupt")
+    finally:
+        graceful_shutdown([worker_process, server_process], 2, 10)
 
     return
 
 
-class APIMethods:
-    """Contains implementations of the API methods
-    of the microservice"""
-
-    @staticmethod
-    def status(receipt: Receipt, monitor: Monitor):
-        """Returns status of the microservice"""
-        receipt.response = ReceiptResponse(statuscode=1, body={})
-        return receipt
-
-    @staticmethod
-    def execute_send(receipt: Receipt, monitor: Monitor):
-        """Sends device parameters in Monitor.
-        Monitor writes them in the DB and returns {}"""
-        response = monitor.send_params(
-            receipt.params, measurement_time=receipt.timestamp
-        )
-        receipt.response = ReceiptResponse(
-            statuscode=1 if response["is_ok"] else 0,
-            body={},
-        )
-        return receipt
-
-    @staticmethod
-    def execute_send_status(receipt: Receipt, monitor: Monitor):
-        """Sends device status in the Monitor.
-        Monitor writes them in the DB and returns {}"""
-        response = monitor.send_status(
-            receipt.params["is_ok"],
-            receipt.params["description"],
-            timestamp=receipt.timestamp,
-        )
-        receipt.response = ReceiptResponse(
-            statuscode=1 if response["is_ok"] else 0,
-            body={},
-        )
-        return receipt
-
-    @staticmethod
-    def execute_get(receipt: Receipt, monitor: Monitor):
-        """Gets device parameters from Monitor"""
-        response = monitor.get_params(
-            receipt.params["start_time"], receipt.params["end_time"]
-        )
-        receipt.response = ReceiptResponse(
-            statuscode=1 if response["is_ok"] else 0,
-            body=(
-                response["params"]
-                if response["is_ok"]
-                else "Something is wrong in the DB. No rows selected."
-            ),
-        )
-        return receipt
-
-    @staticmethod
-    def execute_get_status(receipt: Receipt, monitor: Monitor):
-        """Gets device status from the Monitor"""
-        response = monitor.get_status(
-            receipt.params["start_time"], receipt.params["end_time"]
-        )
-        receipt.response = ReceiptResponse(
-            statuscode=1 if response["is_ok"] else 0,
-            body=(
-                response["status"]
-                if response["is_ok"]
-                else "Something is wrong in the DB. No rows selected."
-            ),
-        )
-        return receipt
-
-    @staticmethod
-    def execute_get_n_downs(receipt: Receipt, monitor: Monitor):
-        """Gets number of downs in the queried time window status from the Monitor"""
-        response = monitor.get_n_downs(
-            receipt.params["start_time"], receipt.params["end_time"]
-        )
-        receipt.response = ReceiptResponse(
-            statuscode=1 if response["is_ok"] else 0,
-            body=(
-                response["n_downs"]
-                if response["is_ok"]
-                else "Something is wrong in the DB. No rows selected."
-            ),
-        )
-        return receipt
-
-    @staticmethod
-    def wrongroute(receipt: Receipt) -> Receipt:
-        """Default answer for the wrong title field in the receipt"""
-        receipt.response = ReceiptResponse(
-            statuscode=404, body="this api method is not found"
-        )
-        return receipt
-
-
-class APIFactory:
-    apiroutes = {
-        "status": APIMethods.status,
-        "send_params": APIMethods.execute_send,
-        "send_status": APIMethods.execute_send_status,
-        "get_params": APIMethods.execute_get,
-        "get_status": APIMethods.execute_get_status,
-        "get_n_downs": APIMethods.execute_get_n_downs,
-    }
-
-    @staticmethod
-    def execute_receipt(receipt: Receipt, monitor: Monitor) -> Receipt:
-        """Matches a function to execute input receipt"""
-
-        if receipt.title in APIFactory.apiroutes:
-            try:
-                return APIFactory.apiroutes[receipt.title](receipt, monitor)
-            except:
-                logging.error("Not processed %s", receipt, exc_info=True)
-        return APIMethods.wrongroute(receipt)
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Monitor microservice")
-    parser.add_argument(
-        "-c",
-        "--config",
-        required=False,
-        type=argparse.FileType("r"),
-        help="Config file",
-        nargs="?",
-    )
-    args = parser.parse_args()
-    settings = config_processor(args.config)
-
-    address = settings.get("monitor", "address")
-    dbpath = settings.get("monitor", "dbpath")
-    param_file_path = settings.get("monitor", "param_file_path")
-    status_file_path = settings.get("monitor", "status_file_path")
-
-    get_logging_config(
-        level=settings.get("monitor", "loglevel"),
-        filepath=settings.get("monitor", "logfile"),
-    )
-    logging.info(
-        "Successfuly started Monitor with arguments %s",
-        dict(settings.items("monitor")),
-    )
-
-    monitor = Monitor(dbpath, param_file_path, status_file_path)
-
-    dbs = RouterServer(address, "monitor")
-
-    loop = asyncio.get_event_loop()
-    try:
-        asyncio.ensure_future(process_message(dbs, monitor))
-        loop.run_forever()
-    except KeyboardInterrupt:
-        logging.info("Keyboard Interrupt. Finish the program")
-    finally:
-        pending = asyncio.all_tasks(loop=loop)
-        for task in pending:
-            task.cancel()
-            logging.debug("Close task %s", task)
-        logging.info("Final program close")
-
-
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
+    main()

@@ -16,7 +16,7 @@ and retrieveing historical information.
 </details>
 
 <details>
- <summary><code>Post</code> <code><b>send_params</b></code> 
+ <summary><code>POST</code> <code><b>send_params</b></code> 
  <code>(writes parameters of the CAEN device to the own DB and online database)</code></summary>
 
 ##### Parameters
@@ -29,7 +29,7 @@ and retrieveing historical information.
 </details>
 
 <details>
- <summary><code>Post</code> <code><b>send_status</b></code> 
+ <summary><code>POST</code> <code><b>send_status</b></code> 
  <code>(writes the status of the CAEN device to the own DB and online database)</code></summary>
 
 ##### Parameters
@@ -73,10 +73,13 @@ and retrieveing historical information.
 
 | title | description | default value |
 |------|-----|-----|
-| `protocol` | conversation protocol of the DeviceBackend | `tcp` |
-| `host` | host name of the DeviceBackend service | `localhost` |
-| `port` | port of the DeviceBackend | `5561` |
-| `address` | device backend address for binding | `${protocol}://*:${port}` |
+| `protocol` | conversation protocol of the MonitorService | `tcp` |
+| `host` | host name of the MonitorService service | `localhost` |
+| `port` | port of the MonitorService | `5561` |
+| `address` | bind address for the MonitorService | `${protocol}://*:${port}` |
+| `device_backend` | connection address for the DeviceBackend | `${device:protocol}://${device:host}:${device:port}` |
+| `monitor` | connection address for the MonitorService | `${protocol}://${host}:${port}` |
+| `update_period` | period of getting data (in seconds) | `1` |
 | `dbpath` | Path to DB | `./monitor.db` |
 | `param_file_path` | Online database parses this file to retrieve channels parameters | `/home/cmd3daq/caendc/data/last_measurement.json` |
 | `status_file_path` | Online database parses this file to retrieve the setup status | `/home/cmd3daq/caendc/data/current_status.json` |
