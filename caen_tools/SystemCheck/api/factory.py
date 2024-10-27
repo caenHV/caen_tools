@@ -12,7 +12,7 @@ class APIFactory:
     }
 
     @staticmethod
-    def execute_receipt(receipt: Receipt, shared_parameters: dict) -> Receipt:
+    async def execute_receipt(receipt: Receipt, shared_parameters: dict) -> Receipt:
         """Matches a function to execute input receipt
 
         Parameters
@@ -29,7 +29,8 @@ class APIFactory:
         """
 
         if receipt.title in APIFactory.apiroutes:
-            return APIFactory.apiroutes[receipt.title](
+            answer = await APIFactory.apiroutes[receipt.title](
                 receipt=receipt, shared_parameters=shared_parameters
             )
+            return answer
         return APIMethods.wrongroute(receipt)

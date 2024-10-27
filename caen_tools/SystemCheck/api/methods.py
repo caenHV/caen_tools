@@ -10,7 +10,7 @@ class APIMethods:
     """A set of API methods of SystemCheck"""
 
     @staticmethod
-    def status(receipt: Receipt, shared_parameters: dict, **kwargs) -> Receipt:
+    async def status(receipt: Receipt, shared_parameters: dict, **kwargs) -> Receipt:
         """Gets status of the SysCheck"""
         logging.debug("Start status method")
         logging.debug("Shared memory / health %s", shared_parameters.get("health"))
@@ -30,7 +30,7 @@ class APIMethods:
         return receipt
 
     @staticmethod
-    def autopilot_enable(
+    async def autopilot_enable(
         receipt: Receipt, shared_parameters: dict, **kwargs
     ) -> Receipt:
         """Gets interlock follow status"""
@@ -49,7 +49,7 @@ class APIMethods:
         return receipt
 
     @staticmethod
-    def set_autopilot(receipt: Receipt, shared_parameters: dict, **kwargs) -> Receipt:
+    async def set_autopilot(receipt: Receipt, shared_parameters: dict, **kwargs) -> Receipt:
         """Sets new state of interlock follow"""
 
         logging.info("Set interlock_follow to %s", receipt.params)

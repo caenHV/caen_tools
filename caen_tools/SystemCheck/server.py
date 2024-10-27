@@ -27,7 +27,7 @@ async def process_message(srv: RouterServer, shared_parameters: dict) -> None:
         client_address, receipt = await srv.recv_receipt()
         logging.info("Received %s from %s", receipt, client_address)
 
-        response = APIFactory.execute_receipt(receipt, shared_parameters)
+        response = await APIFactory.execute_receipt(receipt, shared_parameters)
         await srv.send_receipt(client_address, response)
         logging.info("send response to client %s", client_address)
 
