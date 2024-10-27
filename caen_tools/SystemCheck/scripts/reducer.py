@@ -143,7 +143,6 @@ class ReducerControl(Script):
         else:
             logging.debug("ReducerControl: restore voltage")
             await self.set_voltage(self.target_voltage)
-            await asyncio.sleep(30)  # waiting for when voltage will raise
             self.send_mchs(True)
 
         exectime = timeit.default_timer() - starttime
