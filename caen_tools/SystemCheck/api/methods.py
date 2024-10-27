@@ -52,11 +52,10 @@ class APIMethods:
     def set_autopilot(receipt: Receipt, shared_parameters: dict, **kwargs) -> Receipt:
         """Sets new state of interlock follow"""
 
-        logging.info("Set interlock_follow to %s", receipt.params)
+        logging.info("Set autopilot value to %s", receipt.params)
         shared_parameters["relax"]["enable"] = bool(receipt.params["value"])
         shared_parameters["reducer"]["enable"] = bool(receipt.params["value"])
 
-        logging.info("new par %s", shared_parameters["interlock"]["enable"])
         shared_parameters["relax"]["target_voltage"] = float(
             receipt.params["target_voltage"]
         )
@@ -64,7 +63,7 @@ class APIMethods:
             receipt.params["target_voltage"]
         )
 
-        logging.info("new par %s", shared_parameters["relax"]["enable"])
+        logging.debug("new par %s", shared_parameters["relax"]["enable"])
         return APIMethods.autopilot_enable(receipt, shared_parameters, **kwargs)
 
     @staticmethod

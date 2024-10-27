@@ -32,12 +32,13 @@ class ReducerControl(Script):
         self,
         shared_parameters: ReducerParametersDict,
         device: Address,
+        monitor: Address,
         interlockdb: InterlockManager,
         mchs: MChSWorker,
         relax: RelaxControl,
     ):
         super().__init__(shared_parameters=shared_parameters)
-        self.cli = AsyncClient({Services.DEVBACK: device})
+        self.cli = AsyncClient({Services.DEVBACK: device, Services.MONITOR: monitor})
         self.interlockdb = interlockdb
         self.mchs = mchs
         self.relax = relax
@@ -115,8 +116,16 @@ class ReducerControl(Script):
         self.send_mchs(False)
         relax_params = (self.relax.target_voltage, self.relax.voltage_modifier)
         self.relax.target_voltage, self.relax.voltage_modifier = self.reduced_voltage, 1
-        logging.debug(
-            "ReducerControl: %s %s",
+        await self.cli.query(
+            PreparedReceipts.sendlog(
+                self.SENDER,
+                f"Start a periodic voltage reduction to {self.relax.target_voltage:.4f}",
+                False,
+            ),
+            receive_time=0.5,
+        )
+        logging.info(
+            "Reducer sets: target %s, modifier %s",
             self.relax.target_voltage,
             self.relax.voltage_modifier,
         )
@@ -131,8 +140,10 @@ class ReducerControl(Script):
             relax_params[0],
             relax_params[1],
         )
-        logging.error(
-            "VALS %s %s", self.relax.target_voltage, self.relax.voltage_modifier
+        logging.info(
+            "Reducer restores: target %s, modifier %s",
+            self.relax.target_voltage,
+            self.relax.voltage_modifier,
         )
         if await self.interlock_status():
             logging.debug(

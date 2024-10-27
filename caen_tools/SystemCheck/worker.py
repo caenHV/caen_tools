@@ -34,9 +34,9 @@ def run_worker(
     # A number of running scripts
     loader = LoaderControl(shared_parameters["loader"], devback_address, mon_address)
     interlock = InterlockControl(shared_parameters["interlock"], interlockdb, mchs)
-    relax = RelaxControl(shared_parameters["relax"], devback_address, interlockdb)
+    relax = RelaxControl(shared_parameters["relax"], devback_address, mon_address, interlockdb)
     reducer = ReducerControl(
-        shared_parameters["reducer"], devback_address, interlockdb, mchs, relax
+        shared_parameters["reducer"], devback_address, mon_address, interlockdb, mchs, relax
     )
     health = HealthControl(
         shared_parameters["health"],

@@ -32,11 +32,12 @@ class RelaxControl(Script):
         self,
         shared_parameters: RelaxParamsDict,
         devback: Address,
+        monitor: Address,
         interlockdb: InterlockManager,
     ):
         logging.debug("Init RelaxControl script")
         super().__init__(shared_parameters=shared_parameters)
-        self.cli = AsyncClient({Services.DEVBACK: devback})
+        self.cli = AsyncClient({Services.DEVBACK: devback, Services.MONITOR: monitor})
         self.__interlockdb = interlockdb
 
     @property
@@ -102,6 +103,11 @@ class RelaxControl(Script):
                 reduced_voltage,
                 reduced_voltage,
             )
+            await self.cli.query(PreparedReceipts.sendlog(
+                self.SENDER,
+                f"Interlock ON. Set {reduced_voltage:.4f}",
+                False,
+            ), receive_time=0.5)
             await self.set_voltage(reduced_voltage)
         elif not interlock and not isclose(
             current_voltage, target_voltage, abs_tol=1e-4
@@ -112,6 +118,11 @@ class RelaxControl(Script):
                 target_voltage,
                 target_voltage,
             )
+            await self.cli.query(PreparedReceipts.sendlog(
+                self.SENDER,
+                f"Interlock OFF. Set {target_voltage:.4f}",
+                False,
+            ), receive_time=0.5)
             await self.set_voltage(target_voltage)
         else:
             logging.debug("All is ok already: current voltage is %.3f", current_voltage)

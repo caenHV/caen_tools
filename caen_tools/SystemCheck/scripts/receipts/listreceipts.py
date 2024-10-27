@@ -80,7 +80,7 @@ class PreparedReceipts:
             title="send_status",
             params=dict(
                 is_ok=not critical_status,
-                description=message,
+                description=f"{message} (by {sender})",
             ),
         )
 
