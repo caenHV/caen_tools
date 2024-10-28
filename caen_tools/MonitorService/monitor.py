@@ -70,6 +70,17 @@ class APIMethods:
         return receipt
 
     @staticmethod
+    def execute_writedict(receipt: Receipt, monitor: Monitor):
+        """Writes params dict from the receipt in the odb file"""
+
+        response = monitor.write_params(receipt.params)
+        receipt.response = ReceiptResponse(
+            statuscode=int(response['is_ok']),
+            body={},
+        )
+        return receipt
+
+    @staticmethod
     def execute_get(receipt: Receipt, monitor: Monitor):
         """Gets device parameters from Monitor"""
         response = monitor.get_params(
@@ -130,6 +141,7 @@ class APIFactory:
     apiroutes = {
         "status": APIMethods.status,
         "send_params": APIMethods.execute_send,
+        "write_dict": APIMethods.execute_writedict,
         "send_status": APIMethods.execute_send_status,
         "get_params": APIMethods.execute_get,
         "get_status": APIMethods.execute_get_status,

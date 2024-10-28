@@ -7,6 +7,7 @@ class Services:
 
     MONITOR = "monitor"
     DEVBACK = "devback"
+    CHECK   = "check"
 
 
 class PreparedReceipts:
@@ -85,6 +86,18 @@ class PreparedReceipts:
         )
 
     @staticmethod
+    def writedict_odb(sender: str, data: dict) -> Receipt:
+        """Writes data to odb file"""
+        logging.debug("Ask for receipt mon/write_smthg")
+
+        return Receipt(
+            sender=sender,
+            executor=Services.MONITOR,
+            title="write_dict",
+            params=data,
+        )
+
+    @staticmethod
     def get_last_downs(sender: str, start_time: int, end_time: int) -> Receipt:
         """Gets number of emergency downs from start_time to end_time from the monitor"""
         logging.debug("Ask for receipt mon/get_last_downs")
@@ -96,4 +109,15 @@ class PreparedReceipts:
                 start_time=int(start_time),
                 end_time=int(end_time),
             ),
+        )
+
+    @staticmethod
+    def get_autopilot_stat(sender: str) -> Receipt:
+        """Gets autopilot status"""
+        logging.debug("Ask for syscheck/autopilot")
+        return Receipt(
+            sender=sender,
+            executor=Services.CHECK,
+            title="status_autopilot",
+            params=dict(),
         )

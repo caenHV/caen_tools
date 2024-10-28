@@ -43,6 +43,18 @@ class ODB_Handler:
             logging.warning("File %s cannot be read", file_path)
         return data
 
+    def __write_file(self, data: dict, file_path: Path) -> dict:
+        tmp_path = file_path.with_name(file_path.name + "_tmp")
+
+        current_data = self.__read_param_file(file_path)
+        current_data.update(data)
+
+        with open(tmp_path, mode="w", encoding="utf-8") as f:
+            json.dump(current_data, f)
+
+        tmp_path.rename(file_path)
+        return current_data
+
     def __write_status_file(
         self, is_ok: bool, description: str, timestamp: int, status_file_path: Path
     ):
@@ -111,6 +123,25 @@ class ODB_Handler:
             is_ok = False
 
         return is_ok
+
+    def write_something_to_file(self, keyvals: dict, file_path: Path) -> bool:
+        """Write (or update) keyvals dict in the file
+
+        Parameters
+        ----------
+        keyvals: dict[str, int | float | str]
+            key-value dictionary to write/update in the file
+        file_path: Path
+            path of the file that will be updated
+        """
+
+        try:
+            self.__write_file(keyvals, file_path)
+        except Exception:
+            logging.warning("Cannot write data %s to file", keyvals)
+            return False
+
+        return True
 
     def write_status(
         self, is_ok: bool, description: str, timestamp: int, status_file_path: Path

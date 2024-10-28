@@ -56,6 +56,30 @@ class Monitor:
         }
         return response
 
+    def write_params(self, params: dict) -> dict:
+        """Writes key value params to odb file.
+
+        Parameters
+        ----------
+        params : dict[str, int | float | str]
+            json dict with key "body" where all parameters are stored
+
+        Returns
+        -------
+        str
+            json response:
+            {
+                "timestamp" : current_time,
+                "is_ok" : True for ok and False if something is wrong.
+            }
+        """
+        is_ok = self.__odb.write_something_to_file(params, self.__param_file_path)
+        response = {
+            "timestamp": int(datetime.now().timestamp()),
+            "is_ok": is_ok,
+        }
+        return response
+
     def send_status(self, is_ok: bool, description: str, timestamp: int) -> dict:
         """Sends the hardware status to the DB.
 

@@ -38,6 +38,7 @@ class HealthControl(Script):
         shared_parameters: HealthParametersDict,
         devback: Address,
         monitor: Address,
+        check: Address,
         mchs: MChSWorker,
         max_currents: dict[str, dict[str, float]],
         ramp_down_trip_time: dict[str, RampDownInfo],
@@ -48,6 +49,7 @@ class HealthControl(Script):
             {
                 Services.MONITOR: monitor,
                 Services.DEVBACK: devback,
+                Services.CHECK: check,
             }
         )
         self.mchs = mchs
@@ -345,6 +347,20 @@ class HealthControl(Script):
                 script.start_ifnot()
             self.shared_parameters["last_down"] = None
 
+    async def __send_system_status(self):
+        autopilot_status = await self.cli.query(
+            PreparedReceipts.get_autopilot_stat(self.SENDER)
+        )
+        if isinstance(autopilot_status.response, ReceiptResponseError):
+            logging.warning("Problem with autopilot status %s", autopilot_status.response)
+            return
+
+        autoplt_stat_val = autopilot_status.response.body['interlock_follow']
+        await self.cli.query(PreparedReceipts.writedict_odb(self.SENDER, dict(
+            AUTOPILOT = int(autoplt_stat_val),
+        )))
+        return
+
     async def exec_function(self):
         """Logic:
         1. Get parameters from CAEN device
@@ -360,6 +376,8 @@ class HealthControl(Script):
         """
         logging.debug("Start HealthControl script")
         starttime = timeit.default_timer()
+
+        await self.__send_system_status()
 
         devback_params = await self.cli.query(
             PreparedReceipts.get_params(
