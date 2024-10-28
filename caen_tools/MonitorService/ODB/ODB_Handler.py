@@ -27,9 +27,21 @@ class ODB_Handler:
             cooked["DCV" + channel] = voltage
             cooked["DCC" + channel] = current
 
+        cur_data = self.__read_param_file(param_file_path)
+        cur_data.update(cooked)
+
         with open(tmp_path, mode="w", encoding="utf-8") as f:
-            json.dump(cooked, f)
+            json.dump(cur_data, f)
         tmp_path.rename(param_file_path)
+
+    def __read_param_file(self, file_path: Path) -> dict:
+        data = dict()
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            logging.warning("File %s cannot be read", file_path)
+        return data
 
     def __write_status_file(
         self, is_ok: bool, description: str, timestamp: int, status_file_path: Path
@@ -37,8 +49,11 @@ class ODB_Handler:
         tmp_path = status_file_path.with_name(status_file_path.name + "_tmp")
         cooked = {"is_ok": is_ok, "description": description, "timestamp": timestamp}
 
+        cur_data = self.__read_param_file(status_file_path)
+        cur_data.update(cooked)
+
         with open(tmp_path, mode="w", encoding="utf-8") as f:
-            json.dump(cooked, f)
+            json.dump(cur_data, f)
         tmp_path.rename(status_file_path)
 
     def clear_db(self):
