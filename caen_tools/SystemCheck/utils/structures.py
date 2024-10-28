@@ -1,5 +1,7 @@
-from dataclasses import dataclass
-from typing import TypeAlias, TypedDict
+from dataclasses import InitVar, dataclass, field
+import logging
+import time
+from typing import ClassVar, TypeAlias, TypedDict
 from enum import Enum, Flag, auto
 
 from caen_tools.utils.utils import get_timestamp
@@ -16,10 +18,27 @@ class Codes(Flag):
     MONITOR_ERROR = auto()
 
 
-class ErrorCode(Enum):
-    OVERCURRENT = 1
-    BADVOLTAGE = 2
-    PARAMS = 3
+class ErrorCode(Flag):
+    OVERCURRENT = auto()
+    BADVOLTAGE = auto()
+    PARAMS = auto()
+    MULTIPLE = auto()
+    CANT_READ = auto()
+
+    @staticmethod
+    def from_ChannelStatus(status):
+        match status:
+            case ChannelStatus(multiple_problems=True):
+                return ErrorCode.MULTIPLE
+            case ChannelStatus(bad_status=True):
+                return ErrorCode.PARAMS
+            case ChannelStatus(voltage_problems=True):
+                return ErrorCode.BADVOLTAGE
+            case ChannelStatus(current_problems=True):
+                return ErrorCode.OVERCURRENT
+            case _:
+                logging.warning("This place must be unreachable.")
+                return ErrorCode.CANT_READ
 
 
 ErrorDescription: TypeAlias = str
@@ -56,6 +75,26 @@ class RampDownInfo:
         self.is_rdown = False
         self.timestamp = None
         self.last_breath = False
+
+    def check_trip_time(self) -> bool:
+        if self.timestamp is None:
+            self.timestamp = time.time()
+            self.last_breath = False
+            self.is_rdown = True
+            return True
+        is_time_exceeded = time.time() - self.timestamp < self.trip_time
+        if not is_time_exceeded:
+            self.reset()
+            return True
+
+        if self.last_breath:
+            self.reset()
+            return is_time_exceeded
+        else:
+            self.timestamp = time.time()
+            self.last_breath = True
+            self.is_rdown = False
+            return True
 
 
 class MCHSDict(TypedDict):
@@ -122,3 +161,111 @@ class SharedParametersDict(TypedDict):
     relax: RelaxParamsDict
     reducer: ReducerParametersDict
     mchs: MCHSDict
+
+
+@dataclass
+class ChannelStatus:
+    """This dataclass represents CAEN channel statuses.
+
+    For statuses other than 'on', 'ramp_up', and 'ramp_down': status == True means it is bad
+    """
+
+    on: bool
+    ramp_up: bool
+    ramp_down: bool
+    over_current: bool
+    over_voltage: bool
+    under_voltage: bool
+    max_V: bool
+    max_I: bool
+    trip: bool
+    overpower: bool
+    over_temperature: bool
+    disabled: bool
+    interlock: bool
+    uncalibrated: bool
+
+    is_ramping: bool = field(init=False)
+    is_bad: bool = field(init=False)
+    multiple_problems: bool = field(init=False)
+    bad_status: bool = field(init=False)
+    voltage_problems: bool = field(init=False)
+    current_problems: bool = field(init=False)
+
+    current: InitVar[float]
+    max_current_config: InitVar[dict[str, float]]
+
+    ramping_mask: ClassVar[list[str]] = ["ramp_up", "ramp_down"]
+
+    other_statuses_mask: ClassVar[list[str]] = [
+        "max_V",
+        "max_I",
+        "trip",
+        "overpower",
+        "over_temperature",
+        "disabled",
+        "interlock",
+        "uncalibrated",
+    ]
+
+    voltage_mask: ClassVar[list[str]] = ["over_voltage", "under_voltage"]
+    current_mask: ClassVar[list[str]] = ["over_current"]
+
+    def __post_init__(self, current: float, max_current_config: dict[str, float]):
+        self.is_ramping = any(
+            [self.__getattribute__(stat) for stat in ChannelStatus.ramping_mask]
+        )
+        self.bad_status = any(
+            [self.__getattribute__(stat) for stat in ChannelStatus.other_statuses_mask]
+        )
+        self.voltage_problems = any(
+            [self.__getattribute__(stat) for stat in ChannelStatus.voltage_mask]
+        )
+
+        max_current_key = "volt_change" if self.is_ramping else "steady"
+        max_current = max_current_config[max_current_key]
+        self.current_problems = any(
+            [self.__getattribute__(stat) for stat in ChannelStatus.current_mask]
+        ) or (current > max_current)
+        problems = [self.bad_status, self.voltage_problems, self.current_problems]
+        self.multiple_problems = len([x for x in problems if x == True]) > 1
+        self.is_bad = any(problems)
+
+    @staticmethod
+    def form(status: str, current: float, max_current_config: dict[str, float]):
+        """Creates an instance of ChannelStatus
+
+        Parameters
+        ----------
+        status : str
+            string read out from the CAEN device. It is a decimal representation of binary status string.
+            For more details read CAEN manuals (e.g. Manual for V6534 Rev9).
+        current : float
+            Current flowing through the channel
+        max_current_config : dict[str, float]
+            Configuration of the eligible currents for the given channel in the following form:
+            {"volt_change" : max_current_change, "steady" : max_current_steady}
+
+        Returns
+        -------
+        ChannelStatus
+        """
+        bin = [ch == "1" for ch in list(format(int(status), "015b")[::-1])]
+        return ChannelStatus(
+            on=bin[0],
+            ramp_up=bin[1],
+            ramp_down=bin[2],
+            over_current=bin[3],
+            over_voltage=bin[4],
+            under_voltage=bin[5],
+            max_V=bin[6],
+            max_I=bin[7],
+            trip=bin[8],
+            overpower=bin[9],
+            over_temperature=bin[10],
+            disabled=bin[11],
+            interlock=bin[12],
+            uncalibrated=bin[13],
+            current=current,
+            max_current_config=max_current_config,
+        )

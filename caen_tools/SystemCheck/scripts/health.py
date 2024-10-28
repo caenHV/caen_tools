@@ -10,6 +10,7 @@ import timeit
 
 from caen_tools.SystemCheck.utils.structures import (
     Address,
+    ChannelStatus,
     CheckStatus,
     RampDownInfo,
     ErrorCode,
@@ -100,153 +101,93 @@ class HealthControl(Script):
         )
         return cur_voltage_mlt <= low_voltage_mlt
 
-    def __check_ch_status(
+    def _overall_checks(
         self, pars: dict
-    ) -> tuple[bool, ErrorCode | None, ErrorDescription | None]:
-        """Check channels statuses.
-
-        Parameters
-        ----------
-        pars : dict
-            channel parameters
-
-        Returns
-        -------
-        tuple[bool, ErrorCode | None, ErrorDescription | None]
-            (is_status_ok, code_of_error, status_description)
-           if is_status_ok == True code_of_error = None and status_description = None
-        """
-
-        def good_status(ch_status: str) -> bool:
-            st = format(int(ch_status), "015b")[::-1][3:13]
-            return int(st) == 0
-
-        def is_only_over_under_voltage(ch_status: str) -> bool:
-            st = format(int(ch_status), "015b")[::-1][3:13]
-            is_only_overvoltage = (
-                (st[1] == "1" or st[2] == "1") and st[0] == "0" and int(st[3:]) == 0
-            )
-            return is_only_overvoltage
-
-        def is_rdown_status(ch_status: str) -> bool:
-            st = format(int(ch_status), "015b")[::-1]
-            return st[2] == "1"
-
-        def check_time(info: RampDownInfo) -> bool:
-            """If is_rdown time exceeds trip_time returns False, otherwise returns True."""
-            if info.timestamp is None:
-                return True
-            return time.time() - info.timestamp < info.trip_time
-
-        status = False
-        errCode = None
-        status_description = None
-        bad_channels = []
-        only_over_under_volt_channels = []
-        ch_statuses = dict()
+    ) -> tuple[dict[str, ChannelStatus] | None, dict[str, ChannelStatus]]:
+        imon_key = lambda value: "IMonH" if value["ImonRange"] == 0 else "IMonL"
+        statuses: dict[str, ChannelStatus] = {}
         try:
             for ch, val in pars.items():
-                ch_statuses[ch] = good_status(val["ChStatus"])
-                if not ch_statuses[ch]:
-                    bad_channels.append(ch)
-                if not ch_statuses[ch] and is_only_over_under_voltage(val["ChStatus"]):
-                    only_over_under_volt_channels.append(ch)
-
-                    if self.__rdown_info[ch].timestamp is None and is_rdown_status(
-                        val["ChStatus"]
-                    ):
-                        self.__rdown_info[ch].timestamp = time.time()
-                        self.__rdown_info[ch].last_breath = False
-                        self.__rdown_info[ch].is_rdown = True
-
-                    if is_rdown_status(val["ChStatus"]):
-                        if check_time(self.__rdown_info[ch]):
-                            ch_statuses[ch] = True
-                        else:
-                            logging.warning(f"Channel {ch} exceeded trip time.")
-                        continue
-
-                    if self.__rdown_info[ch].last_breath:
-                        if not check_time(self.__rdown_info[ch]):
-                            ch_statuses[ch] = False
-                            self.__rdown_info[ch].reset()
-                            logging.warning(f"Channel {ch} exceeded trip time.")
-                        else:
-                            ch_statuses[ch] = True
-                    else:
-                        self.__rdown_info[ch].is_rdown = False
-                        self.__rdown_info[ch].last_breath = True
-                        self.__rdown_info[ch].timestamp = time.time()
-                        ch_statuses[ch] = True
-                        logging.warning(
-                            f"Channel {ch} is not in a ramp down but is in over/under voltage. It receives last breath trip time."
-                        )
-
-                self.__rdown_info[ch].last_breath = False
-                self.__rdown_info[ch].timestamp = None
-
-            status = all(ch_statuses.values())
-        except Exception as e:
-            logging.warning("Can't check channels status. %s", e)
-
-        if not status:
-            status_description = f"Channels {bad_channels} statuses are bad, of which {only_over_under_volt_channels} channels are in over/under voltage."
-            errCode = (
-                ErrorCode.BADVOLTAGE
-                if only_over_under_volt_channels == bad_channels
-                else ErrorCode.PARAMS
-            )
-            logging.warning(status_description)
-        return status, errCode, status_description
-
-    def __check_currents(
-        self, pars: dict
-    ) -> tuple[bool, ErrorCode | None, ErrorDescription | None]:
-        def max_current_key(ch_status: str) -> str:
-            st = format(int(ch_status), "015b")[::-1][:13]
-            key = "volt_change" if int(st[1]) == 1 or int(st[2]) == 1 else "steady"
-            return key
-
-        imon_key = lambda value: "IMonH" if value["ImonRange"] == 0 else "IMonL"
-
-        status = False
-        errCode = None
-        error_description = None
-        currents_status = {}
-        try:
-            currents_status = {
-                ch: val[imon_key(val)]
-                < self.__max_currents[ch][max_current_key(val["ChStatus"])]
-                for ch, val in pars.items()
+                statuses[ch] = ChannelStatus.form(
+                    val["ChStatus"], val[imon_key(val)], self.__max_currents[ch]
+                )
+            bad_channels = {
+                ch: status for ch, status in statuses.items() if status.is_bad
             }
-            status = all(currents_status.values())
-            if not status:
-                errCode = ErrorCode.OVERCURRENT
-                error_description = f"Channels {[ch for ch, stat in currents_status.items() if not stat]} currents are bad."
-                logging.warning(error_description)
-        except KeyError as e:
-            errCode = ErrorCode.OVERCURRENT
-            error_description = f"Can't find channel max current in config: {e}"
-            logging.warning(error_description)
-            status = False
+        except Exception as e:
+            bad_channels = None
+            logging.warning("Something went wrong during channel check: %s", e)
+        return bad_channels, statuses
 
-        return status, errCode, error_description
+    def _apply_trip_time_premium(
+        self,
+        bad_channels: dict[str, ChannelStatus],
+    ):
+        ch_statuses = {}
+        for ch, status in bad_channels.items():
+            match status:
+                case ChannelStatus(bad_status=True):
+                    ch_statuses[ch] = False
+                case ChannelStatus(
+                    ramp_down=True, current_problems=True
+                ) | ChannelStatus(ramp_down=True, voltage_problems=True):
+                    # Trip time logic is here
+                    ch_statuses[ch] = self.__rdown_info[ch].check_trip_time()
+                    if not ch_statuses[ch]:
+                        logging.warning(f"Channel {ch} exceeded trip time.")
+                case ChannelStatus(current_problems=True) | ChannelStatus(
+                    voltage_problems=True
+                ):
+                    logging.warning(
+                        f"Channel {ch} is not in a ramp down but is in either over/under voltage or over current. It is on its last breath trip time."
+                    )
+                    ch_statuses[ch] = self.__rdown_info[ch].check_trip_time()
+        try:
+            bad_channels_errs = {
+                ch: ErrorCode.from_ChannelStatus(status)
+                for ch, status in bad_channels
+                if not ch_statuses[ch]
+            }
+
+            overall_error = None
+            error_description = ""
+            if len(bad_channels_errs) > 0:
+                overall_error = reduce(
+                    lambda val, sum: val | sum, bad_channels_errs.values()
+                )
+                if len(overall_error) > 1:
+                    overall_error = ErrorCode.MULTIPLE
+
+                error_description = f"There are following problems {[f'Channel {ch}: {err_code}' for ch, err_code in bad_channels.items()]}. Overall status is {overall_error}."
+        except Exception as e:
+            overall_error = ErrorCode.CANT_READ
+            logging.warning(
+                "Something went wrong while the trip time criteria had been checked: %s",
+                e,
+            )
+            error_description = (
+                f"Something went wrong while the trip time criteria had been checked."
+            )
+        return overall_error, error_description
 
     def perform_checks(self, params_dict: dict) -> CheckStatus:
         """All checks of the recieved parameters are here"""
 
         logging.debug("Perform parameters check: %s", params_dict)
 
-        is_status_ok, status_error_code, status_status_description = (
-            self.__check_ch_status(params_dict)
-        )
-        is_current_ok, current_error_code, current_status_description = (
-            self.__check_currents(params_dict)
-        )
-        is_ramping = self._check_ramping(params_dict)
+        bad_channels, all_statuses = self._overall_checks(params_dict)
+        if bad_channels is None:
+            error_code = ErrorCode.CANT_READ
+            status_description = "Something went wrong during channel check."
+        else:
+            error_code, status_description = self._apply_trip_time_premium(bad_channels)
+
+        is_ramping = any([status.is_ramping for _, status in all_statuses.items()])
+        if is_ramping:
+            logging.info("Ramping status detected")
         is_lowvolt = self._check_lowvolt(params_dict)
 
-        good_device = is_status_ok and is_current_ok
+        good_device = error_code is None
         unstable_params = is_ramping or is_lowvolt
 
         if good_device and not unstable_params:
@@ -254,19 +195,12 @@ class HealthControl(Script):
         elif good_device and unstable_params:
             return CheckStatus(ack=False)
 
-        logging.warning("Bad parameters found: %s", params_dict)
-        if not is_status_ok and not is_current_ok:
-            return CheckStatus(
-                ack=False, failure=(current_error_code, current_status_description)  # type: ignore
-            )
-        if not is_status_ok and is_current_ok:
-            return CheckStatus(
-                ack=False, failure=(status_error_code, status_status_description)  # type: ignore
-            )
-        else:
-            return CheckStatus(
-                ack=False, failure=(current_error_code, current_status_description)  # type: ignore
-            )
+        logging.warning(
+            "Device is not ok: error = %s, description = %s",
+            error_code,
+            status_description,
+        )
+        return CheckStatus(ack=False, failure=(error_code, status_description))  # type: ignore
 
     def send_mchs(self, status: bool) -> None:
         """Sends ACK (True) or NACK (False) on MChS"""
@@ -352,13 +286,20 @@ class HealthControl(Script):
             PreparedReceipts.get_autopilot_stat(self.SENDER)
         )
         if isinstance(autopilot_status.response, ReceiptResponseError):
-            logging.warning("Problem with autopilot status %s", autopilot_status.response)
+            logging.warning(
+                "Problem with autopilot status %s", autopilot_status.response
+            )
             return
 
-        autoplt_stat_val = autopilot_status.response.body['interlock_follow']
-        await self.cli.query(PreparedReceipts.writedict_odb(self.SENDER, dict(
-            AUTOPILOT = int(autoplt_stat_val),
-        )))
+        autoplt_stat_val = autopilot_status.response.body["interlock_follow"]
+        await self.cli.query(
+            PreparedReceipts.writedict_odb(
+                self.SENDER,
+                dict(
+                    AUTOPILOT=int(autoplt_stat_val),
+                ),
+            )
+        )
         return
 
     async def exec_function(self):
