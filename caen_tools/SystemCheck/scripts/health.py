@@ -360,7 +360,7 @@ class HealthControl(Script):
         params_dict = devback_params.response.body["params"]
         status: CheckStatus = self.perform_checks(params_dict)
 
-        if status.ack is False:
+        if status.failure is not None:
             await self.failure_actions(status)
         else:
             self.send_mchs(status.ack)
