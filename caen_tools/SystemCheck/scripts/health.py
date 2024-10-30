@@ -211,7 +211,7 @@ class HealthControl(Script):
     async def failure_actions(self, status: CheckStatus) -> None:
         """A number of actions on failure"""
 
-        logging.error("Bad deivce parameters. Emergency DownVoltage!")
+        logging.error("Bad device parameters. Emergency DownVoltage!")
 
         for script in self.dependent_scripts:
             script.stop()
@@ -360,7 +360,7 @@ class HealthControl(Script):
         params_dict = devback_params.response.body["params"]
         status: CheckStatus = self.perform_checks(params_dict)
 
-        if status.failure is not None:
+        if status.ack is False:
             await self.failure_actions(status)
         else:
             self.send_mchs(status.ack)
