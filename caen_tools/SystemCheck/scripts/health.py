@@ -145,7 +145,7 @@ class HealthControl(Script):
         try:
             bad_channels_errs = {
                 ch: ErrorCode.from_ChannelStatus(status)
-                for ch, status in bad_channels
+                for ch, status in bad_channels.items()
                 if not ch_statuses[ch]
             }
 
