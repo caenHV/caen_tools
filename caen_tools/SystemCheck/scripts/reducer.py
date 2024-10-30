@@ -100,8 +100,7 @@ class ReducerControl(Script):
         # Start logic in the end of the cycle time interval
         waiting_time = max(
             0,
-            self.shared_parameters["repeat_every"]
-            - self.shared_parameters["reducing_period"],
+            self.shared_parameters["repeat_every"],
         )
         logging.debug("Wait for %s", waiting_time)
         await asyncio.sleep(waiting_time)

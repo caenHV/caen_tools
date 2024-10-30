@@ -117,6 +117,12 @@ class CheckResult:
             self.timestamp = get_timestamp()
 
 
+class AutopilotDict(TypedDict):
+    """General autopilot section structure"""
+
+    run: list[str]
+
+
 class MinimalScriptDict(TypedDict):
     """Minimal script config structure"""
 

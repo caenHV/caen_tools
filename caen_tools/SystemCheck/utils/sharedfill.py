@@ -4,6 +4,7 @@ import logging
 import multiprocessing as mp
 
 from .structures import (
+    AutopilotDict,
     MCHSDict,
     LoaderDict,
     InterlockParametersDict,
@@ -57,9 +58,23 @@ def sharedmemo_fillup(
     )
     logging.debug("Interlock defaults: %s", interlock)
 
+    autopilot_section = f"{section}.autopilot"
+    autopilot: AutopilotDict = manager.dict(
+        run=list(
+            filter(
+                lambda x: x != "",
+                map(
+                    lambda x: x.strip(),
+                    settings.get(autopilot_section, "run").split(","),
+                ),
+            ),
+        ),
+    )
+    logging.debug("Autopilot defaults: %s", autopilot)
+
     relax_section = f"{section}.autopilot.relax"
     relax: RelaxParamsDict = manager.dict(
-        enable=settings.getboolean(relax_section, "enable"),
+        enable=False,
         repeat_every=settings.getfloat(relax_section, "repeat_every"),
         last_check=None,
         voltage_modifier=settings.getfloat(relax_section, "voltage_modifier"),
@@ -69,7 +84,7 @@ def sharedmemo_fillup(
 
     reducer_section = f"{section}.autopilot.reducer"
     reducer: ReducerParametersDict = manager.dict(
-        enable=settings.getboolean(reducer_section, "enable"),
+        enable=False,
         repeat_every=settings.getfloat(reducer_section, "repeat_every"),
         last_check=None,
         voltage_modifier=settings.getfloat(reducer_section, "voltage_modifier"),
@@ -82,6 +97,7 @@ def sharedmemo_fillup(
         loader=loader,
         health=health,
         interlock=interlock,
+        autopilot=autopilot,
         relax=relax,
         reducer=reducer,
         mchs=mchs,

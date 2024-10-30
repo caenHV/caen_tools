@@ -22,7 +22,13 @@ class APIMethods:
                     enable=shared_parameters.get("health").get("enable"),
                 ),
                 autopilot=dict(
-                    enable=shared_parameters.get("relax").get("enable"),
+                    enable=all(
+                        [
+                            shared_parameters[script_name]["enable"]
+                            for script_name in shared_parameters["autopilot"]["run"]
+                        ]
+                    ),
+                    runscripts=",".join(shared_parameters["autopilot"]["run"]),
                 ),
             ),
             timestamp=get_timestamp(),
@@ -33,15 +39,17 @@ class APIMethods:
     def autopilot_enable(
         receipt: Receipt, shared_parameters: dict, **kwargs
     ) -> Receipt:
-        """Gets interlock follow status"""
+        """Gets autopilot status"""
 
         logging.debug("Start autopilot_enable receipt")
         receipt.response = ReceiptResponse(
             statuscode=1,
             body=dict(
-                interlock_follow=(
-                    shared_parameters.get("relax").get("enable")
-                    and shared_parameters.get("reducer").get("enable")
+                interlock_follow=all(
+                    [
+                        shared_parameters[script_name]["enable"]
+                        for script_name in shared_parameters["autopilot"]["run"]
+                    ]
                 )
             ),
             timestamp=get_timestamp(),
@@ -53,17 +61,14 @@ class APIMethods:
         """Sets new state of interlock follow"""
 
         logging.info("Set autopilot value to %s", receipt.params)
-        shared_parameters["relax"]["enable"] = bool(receipt.params["value"])
-        shared_parameters["reducer"]["enable"] = bool(receipt.params["value"])
+        for script_name in shared_parameters["autopilot"]["run"]:
+            shared_parameters[script_name]["enable"] = bool(receipt.params["value"])
 
-        shared_parameters["relax"]["target_voltage"] = float(
-            receipt.params["target_voltage"]
-        )
-        shared_parameters["reducer"]["target_voltage"] = float(
-            receipt.params["target_voltage"]
-        )
+            shared_parameters[script_name]["target_voltage"] = float(
+                receipt.params["target_voltage"]
+            )
 
-        logging.debug("new par %s", shared_parameters["relax"]["enable"])
+            logging.debug("new par %s", shared_parameters[script_name]["enable"])
         return APIMethods.autopilot_enable(receipt, shared_parameters, **kwargs)
 
     @staticmethod

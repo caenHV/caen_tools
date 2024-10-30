@@ -39,6 +39,8 @@ class Script(ABC):
             return
 
         self.shared_parameters["enable"] = False
+
+        self.task.cancel()
         self.task = None
         asyncio.create_task(self.on_stop())
         logging.warning("Stop the script")
@@ -48,6 +50,7 @@ class Script(ABC):
         """Asks script for turning on/off"""
 
         if self.shared_parameters["enable"] is True and self.task is None:
+            logging.debug("Trigger: start if not script %s", self.shared_parameters)
             self.start_ifnot()
         elif self.shared_parameters["enable"] is False and self.task is not None:
             self.stop()
