@@ -7,7 +7,7 @@ class Services:
 
     MONITOR = "monitor"
     DEVBACK = "devback"
-    CHECK   = "check"
+    CHECK = "check"
 
 
 class PreparedReceipts:
@@ -120,4 +120,15 @@ class PreparedReceipts:
             executor=Services.CHECK,
             title="status_autopilot",
             params=dict(),
+        )
+
+    @staticmethod
+    def set_autopilot(sender: str, start: bool, target_voltage: float) -> Receipt:
+        """Gets autopilot status"""
+        logging.debug("Send start signal to syscheck/autopilot")
+        return Receipt(
+            sender=sender,
+            executor=Services.CHECK,
+            title="set_autopilot",
+            params={"value": start, "target_voltage": target_voltage},
         )

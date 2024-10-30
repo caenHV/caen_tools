@@ -29,6 +29,8 @@ class APIMethods:
                         ]
                     ),
                     runscripts=",".join(shared_parameters["autopilot"]["run"]),
+                    # FIXME: Костыль!!! Нужно иначе хранить target_voltage
+                    target_voltage=shared_parameters["relax"]["target_voltage"],
                 ),
             ),
             timestamp=get_timestamp(),

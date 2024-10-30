@@ -251,7 +251,7 @@ class HealthControl(Script):
         start_time = end_time - self.shared_parameters["allowed_down_window"]
         get_n_downs = await self.cli.query(
             PreparedReceipts.get_last_downs(
-                self.SENDER, start_time=start_time, end_time=end_time
+                self.SENDER, start_time=int(start_time), end_time=int(end_time)
             )
         )
         if isinstance(get_n_downs.response, ReceiptResponseError):
@@ -277,9 +277,32 @@ class HealthControl(Script):
             and time.time() - self.shared_parameters["last_down"]
             < self.shared_parameters["auto_restart_after"]
         ):
-            for script in self.dependent_scripts:
-                script.start_ifnot()
             self.shared_parameters["last_down"] = None
+            autopilot_status = await self.cli.query(
+                PreparedReceipts.get_autopilot_stat(self.SENDER), 1
+            )
+            if isinstance(autopilot_status.response, ReceiptResponseError):
+                logging.warning(
+                    "Problem with autopilot status %s", autopilot_status.response
+                )
+                return
+            target_voltage = autopilot_status.response.body.get("target_voltage", None)
+            is_interlock_follow = autopilot_status.response.body.get(
+                "interlock_follow", None
+            )
+            if is_interlock_follow is True and target_voltage is not None:
+                autopilot_restart = await self.cli.query(
+                    PreparedReceipts.set_autopilot(self.SENDER, True, target_voltage), 1
+                )
+                if isinstance(autopilot_restart.response, ReceiptResponseError):
+                    logging.warning(
+                        "Problem with autopilot start %s", autopilot_restart.response
+                    )
+                    return
+                logging.info(
+                    "Autopilot was restarted after emergency down with target voltage = %s",
+                    target_voltage,
+                )
 
     async def __send_system_status(self):
         autopilot_status = await self.cli.query(
