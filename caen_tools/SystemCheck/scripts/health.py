@@ -238,7 +238,11 @@ class HealthControl(Script):
         await self.cli.query(
             PreparedReceipts.sendlog(
                 self.SENDER,
-                "Down voltage due to bad device params",
+                (
+                    f"{status.failure[0]}: {status.failure[1]}"
+                    if status is not None
+                    else "Down voltage due to bad device params (generic error)"
+                ),
                 True,
             ),
             receive_time=0.5,
