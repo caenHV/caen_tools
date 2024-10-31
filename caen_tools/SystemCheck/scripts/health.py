@@ -126,18 +126,14 @@ class HealthControl(Script):
         ch_statuses = {}
         for ch, status in bad_channels.items():
             match status:
-                case ChannelStatus(bad_status=True):
+                case ChannelStatus(bad_status=True) | ChannelStatus(current_problems=True):
                     ch_statuses[ch] = False
-                case ChannelStatus(
-                    ramp_down=True, current_problems=True
-                ) | ChannelStatus(ramp_down=True, voltage_problems=True):
+                case ChannelStatus(ramp_down=True, voltage_problems=True):
                     # Trip time logic is here
                     ch_statuses[ch] = self.__rdown_info[ch].check_trip_time()
                     if not ch_statuses[ch]:
                         logging.warning(f"Channel {ch} exceeded trip time.")
-                case ChannelStatus(current_problems=True) | ChannelStatus(
-                    voltage_problems=True
-                ):
+                case ChannelStatus(voltage_problems=True):
                     logging.warning(
                         f"Channel {ch} is not in a ramp down but is in either over/under voltage or over current. It is on its last breath trip time."
                     )
