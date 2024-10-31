@@ -1,6 +1,7 @@
 """Defines API methods for DeviceBackend microservice"""
 
 from functools import reduce
+from time import sleep
 
 import json
 import logging
@@ -115,6 +116,17 @@ class APIMethods:
         return receipt
 
     @staticmethod
+    def reset(receipt: Receipt, h: Handler) -> Receipt:
+        """Resets all layers"""
+
+        logging.info("Start reset ticket %s", receipt)
+        h.pw_down()
+        sleep(0.5)
+        h.pw_up()
+        receipt.response = ReceiptResponse(statuscode=1, body="All is ok")
+        return receipt
+
+    @staticmethod
     def wrongroute(receipt: Receipt) -> Receipt:
         """Default answer for the wrong title field in the receipt"""
 
@@ -134,6 +146,7 @@ class APIFactory:
         "get_voltage": APIMethods.get_voltage,
         "params": APIMethods.params,
         "down": APIMethods.down,
+        "reset": APIMethods.reset,
     }
 
     @staticmethod

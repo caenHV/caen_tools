@@ -269,7 +269,6 @@ async def down(
     )
     down_resp = await cli.query(down_voltage)
 
-
     message = f"Down voltage (by {sender})"
     background_tasks.add_task(
         writelog, message=message, critical_status=True, sender=sender
@@ -313,6 +312,28 @@ async def device_params_api(
 
     logging.debug("Start device_params_api")
     response = await device_params(sender)
+    return response
+
+
+@app.get(f"/{Services.DEVBACK.title}/reset", tags=[Services.DEVBACK.title])
+@response_provider
+async def reset_api(sender: Annotated[str, Query(max_length=50)] = "webcli") -> Receipt:
+    """[WS Backend API]
+    Reset channels of CAEN setup
+
+    Parameters
+    ----------
+    - **sender**: string identifier of the request sender
+    """
+
+    logging.debug("Start reset_ch_api")
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.DEVBACK.title,
+        title="reset",
+        params={},
+    )
+    response = await cli.query(receipt)
     return response
 
 
@@ -411,6 +432,7 @@ async def setparamsdb(
     resp = await cli.query(receipt)
     return resp
 
+
 @app.get(f"/{Services.MONITOR.title}/logs", tags=[Services.MONITOR.title])
 @response_provider
 async def getlogs(
@@ -435,7 +457,9 @@ async def getlogs(
 
     logging.info("Logs requested by %s", sender)
     one_day = 60 * 60 * 24
-    start_timestamp = get_timestamp() - one_day if start_timestamp is None else start_timestamp
+    start_timestamp = (
+        get_timestamp() - one_day if start_timestamp is None else start_timestamp
+    )
     stop_timestamp = get_timestamp() if stop_timestamp is None else stop_timestamp
 
     receipt = Receipt(
@@ -484,6 +508,7 @@ async def writelog(
     )
     resp = await cli.query(receipt)
     return resp
+
 
 # System check API routes
 
@@ -579,7 +604,11 @@ async def set_interlock_follow(
     )
     resp = await cli.query(receipt)
 
-    message = f"Turn on autopilot: target {target_voltage:.4f}" if value else "Turn off autopilot" 
+    message = (
+        f"Turn on autopilot: target {target_voltage:.4f}"
+        if value
+        else "Turn off autopilot"
+    )
     message = f"{message} (by {sender})"
     background_tasks.add_task(
         writelog, message=message, critical_status=False, sender=sender
