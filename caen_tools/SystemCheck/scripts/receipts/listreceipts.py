@@ -118,7 +118,7 @@ class PreparedReceipts:
         return Receipt(
             sender=sender,
             executor=Services.CHECK,
-            title="status_autopilot",
+            title="status",
             params=dict(),
         )
 
