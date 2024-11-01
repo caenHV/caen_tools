@@ -231,6 +231,8 @@ class HealthControl(Script):
             )
             down_voltage = await self.cli.query(PreparedReceipts.down(self.SENDER))
             logging.info("Final response (%s)", down_voltage.response)
+        
+        await self.cli.query(PreparedReceipts.reset_device(self.SENDER))
 
         self.shared_parameters["last_down"] = time.time()
         await self.cli.query(

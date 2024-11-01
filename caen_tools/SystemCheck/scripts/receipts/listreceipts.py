@@ -60,6 +60,17 @@ class PreparedReceipts:
         )
 
     @staticmethod
+    def reset_device(sender: str) -> Receipt:
+        """Resets channels"""
+        logging.debug("Ask for receipt devback/reset")
+        return Receipt(
+            sender=sender,
+            executor=Services.DEVBACK,
+            title="reset",
+            params={},
+        )
+
+    @staticmethod
     def put2mon(sender: str, params: dict) -> Receipt:
         """Puts parameters into monitor"""
         logging.debug("Ask for receipt mon/send_params")
