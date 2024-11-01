@@ -231,7 +231,7 @@ class HealthControl(Script):
             )
             down_voltage = await self.cli.query(PreparedReceipts.down(self.SENDER))
             logging.info("Final response (%s)", down_voltage.response)
-        
+
         await self.cli.query(PreparedReceipts.reset_device(self.SENDER))
 
         self.shared_parameters["last_down"] = time.time()
@@ -282,10 +282,14 @@ class HealthControl(Script):
             )
             return
 
-        logging.debug(f"Last down timestamp is = {self.shared_parameters["last_down"]}, autorestart time = {self.shared_parameters["auto_restart_after"]}")
-        if (
-            self.shared_parameters["last_down"] is not None
-            and (time.time() - self.shared_parameters["last_down"] > self.shared_parameters["auto_restart_after"])
+        logging.debug(
+            "Last down timestamp is = %s, autorestart time = %s",
+            self.shared_parameters["last_down"],
+            self.shared_parameters["auto_restart_after"],
+        )
+        if self.shared_parameters["last_down"] is not None and (
+            time.time() - self.shared_parameters["last_down"]
+            > self.shared_parameters["auto_restart_after"]
         ):
             self.shared_parameters["last_down"] = None
             autopilot_status = await self.cli.query(

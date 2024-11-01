@@ -11,14 +11,18 @@ class ODB_Handler:
 
         self.con = sqlite3.connect(self.__dbpath)
         self.con.row_factory = sqlite3.Row  # to fetch dicts (not simple tuples)
+        self.con.execute('''PRAGMA synchronous = OFF''')  
+        self.con.execute('''PRAGMA journal_mode = OFF''')
         self.con.execute(
             "CREATE TABLE IF NOT EXISTS data (idx INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, voltage REAL, current REAL, t INTEGER, status INTEGER);"
-        ).close()
+        )
         self.con.execute(
             "CREATE TABLE IF NOT EXISTS status (idx INTEGER PRIMARY KEY AUTOINCREMENT, is_ok BOOLEAN , description TEXT, t INTEGER);"
-        ).close()
+        )
+
         self.__records_after_delete_counter: int = 0
         self.__cleaning_frequency: int = cleaning_frequency
+        self.__last_status = None
 
     def __write_param_file(self, results: list, param_file_path: Path):
         tmp_path = param_file_path.with_name(param_file_path.name + "_tmp")
@@ -144,7 +148,12 @@ class ODB_Handler:
         return True
 
     def write_status(
-        self, is_ok: bool, description: str, timestamp: int, status_file_path: Path
+        self,
+        is_ok: bool,
+        description: str,
+        timestamp: int,
+        status_file_path: Path,
+        glue_interval: int = 60,
     ) -> bool:
         """Writes the hardware status to the DB.
 
@@ -158,32 +167,43 @@ class ODB_Handler:
             time from the epoch of the status issue.
         status_file_path: Path
             Path to the file that is listened by the ODB connector (Anisyonkov program)
+        glue_interval: int (default is 60 s)
+            the period (in seconds) during which consecutive statuses with the same 
+            `description` field are interpreted as the same
 
         Returns
         -------
         bool
             True if everything is ok. If something went wrong returns False.
         """
+
+        new_status = (is_ok, description, timestamp)
+        self.__last_status, old_status = new_status, self.__last_status
+        if old_status is not None:
+            _, desc_old, t_old = old_status
+            if desc_old == description and abs(timestamp - t_old) < glue_interval:
+                return True
+
         with self.con:
             try:
                 self.con.execute(
                     "INSERT INTO status(is_ok, description, t) VALUES(?, ?, ?)",
-                    (is_ok, description, timestamp),
+                    self.__last_status,
                 ).close()
                 self.__records_after_delete_counter += 1
                 if self.__records_after_delete_counter > self.__cleaning_frequency:
                     self.clear_db()
                     self.__records_after_delete_counter = 0
 
-            except sqlite3.DatabaseError as e:
+            except sqlite3.DatabaseError:
                 is_ok = False
                 logging.warning(
-                    f"Houston! We faced problems with the Status Database: {e}."
+                    "Houston! We faced problems with the Status Database", exc_info=True
                 )
         try:
             self.__write_status_file(is_ok, description, timestamp, status_file_path)
-        except Exception as e:
-            logging.warning(f"Problems with writing file for the ODB: {e}")
+        except Exception:
+            logging.warning("Problems with writing file for the ODB", exc_info=True)
             is_ok = False
 
         return is_ok
