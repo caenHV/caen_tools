@@ -293,7 +293,9 @@ class HealthControl(Script):
                     "Problem with autopilot status %s", autopilot_status.response
                 )
                 return
-            target_voltage = autopilot_status.response.body.get("target_voltage", None)
+            target_voltage = autopilot_status.response.body["autopilot"].get(
+                "target_voltage", None
+            )
             logging.info(f"target_voltage = {target_voltage}")
 
             if target_voltage is not None:
