@@ -283,8 +283,7 @@ class HealthControl(Script):
         logging.debug(f"Last down timestamp is = {self.shared_parameters["last_down"]}, autorestart time = {self.shared_parameters["auto_restart_after"]}")
         if (
             self.shared_parameters["last_down"] is not None
-            and time.time() - self.shared_parameters["last_down"]
-            < self.shared_parameters["auto_restart_after"]
+            and (time.time() - self.shared_parameters["last_down"] > self.shared_parameters["auto_restart_after"])
         ):
             self.shared_parameters["last_down"] = None
             autopilot_status = await self.cli.query(
