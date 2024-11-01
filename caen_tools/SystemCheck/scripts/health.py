@@ -126,7 +126,9 @@ class HealthControl(Script):
         ch_statuses = {}
         for ch, status in bad_channels.items():
             match status:
-                case ChannelStatus(bad_status=True) | ChannelStatus(current_problems=True):
+                case ChannelStatus(bad_status=True) | ChannelStatus(
+                    current_problems=True
+                ):
                     ch_statuses[ch] = False
                 case ChannelStatus(ramp_down=True, voltage_problems=True):
                     # Trip time logic is here
@@ -271,6 +273,11 @@ class HealthControl(Script):
         ):
             self.shared_parameters["last_down"] = None
             self.shared_parameters["auto_restart"] = False
+            logging.warning(
+                "Too many emergency downs (%s) in last %s seconds. Autopilot will not be restarted.",
+                n_consecutive_downs,
+                self.shared_parameters["allowed_down_window"],
+            )
 
         if (
             self.shared_parameters["last_down"] is not None
@@ -287,10 +294,9 @@ class HealthControl(Script):
                 )
                 return
             target_voltage = autopilot_status.response.body.get("target_voltage", None)
-            is_interlock_follow = autopilot_status.response.body.get(
-                "interlock_follow", None
-            )
-            if is_interlock_follow is True and target_voltage is not None:
+            logging.info(f"target_voltage = {target_voltage}")
+
+            if target_voltage is not None:
                 autopilot_restart = await self.cli.query(
                     PreparedReceipts.set_autopilot(self.SENDER, True, target_voltage), 1
                 )
