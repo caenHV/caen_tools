@@ -278,7 +278,9 @@ class HealthControl(Script):
                 n_consecutive_downs,
                 self.shared_parameters["allowed_down_window"],
             )
+            return
 
+        logging.debug(f"Last down timestamp is = {self.shared_parameters["last_down"]}, autorestart time = {self.shared_parameters["auto_restart_after"]}")
         if (
             self.shared_parameters["last_down"] is not None
             and time.time() - self.shared_parameters["last_down"]
