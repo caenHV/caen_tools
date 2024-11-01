@@ -112,13 +112,24 @@ class PreparedReceipts:
         )
 
     @staticmethod
-    def get_autopilot_stat(sender: str) -> Receipt:
+    def get_autopilot_params(sender: str) -> Receipt:
         """Gets autopilot status"""
         logging.debug("Ask for syscheck/autopilot")
         return Receipt(
             sender=sender,
             executor=Services.CHECK,
             title="status",
+            params=dict(),
+        )
+
+    @staticmethod
+    def get_status_autopilot(sender: str) -> Receipt:
+        """Gets autopilot status"""
+        logging.debug("Ask for syscheck/autopilot")
+        return Receipt(
+            sender=sender,
+            executor=Services.CHECK,
+            title="status_autopilot",
             params=dict(),
         )
 

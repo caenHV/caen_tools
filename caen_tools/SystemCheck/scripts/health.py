@@ -286,7 +286,7 @@ class HealthControl(Script):
         ):
             self.shared_parameters["last_down"] = None
             autopilot_status = await self.cli.query(
-                PreparedReceipts.get_autopilot_stat(self.SENDER), 1
+                PreparedReceipts.get_autopilot_params(self.SENDER), 1
             )
             if isinstance(autopilot_status.response, ReceiptResponseError):
                 logging.warning(
@@ -312,7 +312,7 @@ class HealthControl(Script):
 
     async def __send_system_status(self):
         autopilot_status = await self.cli.query(
-            PreparedReceipts.get_autopilot_stat(self.SENDER)
+            PreparedReceipts.get_status_autopilot(self.SENDER)
         )
         if isinstance(autopilot_status.response, ReceiptResponseError):
             logging.warning(
