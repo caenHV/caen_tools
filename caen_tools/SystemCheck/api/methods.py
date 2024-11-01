@@ -29,6 +29,12 @@ class APIMethods:
                         ]
                     ),
                     runscripts=",".join(shared_parameters["autopilot"]["run"]),
+                    interlock_follow=all(
+                        [
+                            shared_parameters[script_name]["enable"]
+                            for script_name in shared_parameters["autopilot"]["run"]
+                        ]
+                    ),
                     # FIXME: Костыль!!! Нужно иначе хранить target_voltage
                     target_voltage=shared_parameters["relax"]["target_voltage"],
                 ),
