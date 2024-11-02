@@ -11,7 +11,7 @@ from caen_tools.SystemCheck.server import run_server
 from caen_tools.SystemCheck.utils.structures import HealthControlSettings
 from caen_tools.SystemCheck.worker import run_worker
 from caen_tools.utils.utils import config_processor, get_logging_config
-from .utils import sharedmemo_fillup, parse_max_currents, parse_trip_time
+from .utils import sharedmemo_fillup
 
 CONFIG_SECTION = "check"
 

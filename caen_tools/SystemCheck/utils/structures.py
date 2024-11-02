@@ -1,13 +1,12 @@
 from configparser import ConfigParser
 from dataclasses import InitVar, dataclass, field
+import json
 import logging
-import pathlib
 import time
 from typing import ClassVar, TypeAlias, TypedDict
-from enum import Enum, Flag, auto
+from enum import Flag, auto
 
 from caen_tools.SystemCheck.scripts.mchswork import MChSWorker
-from caen_tools.SystemCheck.utils.utils import parse_max_currents, parse_trip_time
 from caen_tools.utils.utils import get_timestamp
 
 # Alias for microservice connection_address "proto://host:port"
@@ -205,11 +204,11 @@ class HealthControlSettings:
                 f"low_voltage_mlt parameter in section {section} must be between non-negative and smaller than 1.2"
             )
 
-        self.max_currents = parse_max_currents(
-            pathlib.Path(settings.get(f"{section}.health", "health_check_config_path"))
+        self.max_currents = self.__parse_max_currents(
+            settings.get(f"{section}.health", "health_check_config_path")
         )
-        self.ramp_down_trip_time = parse_trip_time(
-            pathlib.Path(settings.get(f"{section}.health", "health_check_config_path"))
+        self.ramp_down_trip_time = self.__parse_trip_time(
+            settings.get(f"{section}.health", "health_check_config_path")
         )
         self.allowed_down_window = settings.getfloat(
             section, "allowed_down_window", fallback=0
@@ -231,6 +230,55 @@ class HealthControlSettings:
             raise ValueError(
                 f"soft_reduce_mod parameter in section {section} must be between 0 and 1."
             )
+
+    @staticmethod
+    def __parse_max_currents(health_config_path: str) -> dict:
+        """Opens health_check config and parses it to retrieve max currents map"""
+        max_currents_map = None
+        try:
+            with open(health_config_path, "r", encoding="utf-8") as f:
+                max_currents_map = json.load(f)["max_current"]
+        except json.JSONDecodeError as e:
+            logging.warning("Invalid JSON syntax in health_config_path: %s", e)
+            raise e
+        except OSError as e:
+            logging.warning("health_config_path points to a nonexistent file: %s", e)
+            raise e
+
+        return max_currents_map
+
+    @staticmethod
+    def __fill_ramp_down_info(trip_time_map: dict) -> dict[str, RampDownInfo]:
+        try:
+            rdown_info = {
+                ch: RampDownInfo(is_rdown=False, trip_time=float(trip_time))
+                for ch, trip_time in trip_time_map.items()
+            }
+        except ValueError as e:
+            logging.warning(
+                "Ramp down trip times in health_config have to be float values: %s", e
+            )
+            raise e
+        return rdown_info
+
+    @staticmethod
+    def __parse_trip_time(health_config_path: str) -> dict[str, RampDownInfo]:
+        """Opens health_check config and parses it to retrieve ramp down trip time map"""
+        try:
+            with open(health_config_path, "r", encoding="utf-8") as f:
+                ramp_down_trip_time = json.load(f)["ramp_down_trip_time"]
+
+            ramp_down_trip_time = HealthControlSettings.__fill_ramp_down_info(
+                ramp_down_trip_time
+            )
+        except json.JSONDecodeError as e:
+            logging.warning("Invalid JSON syntax in health_config_path: %s", e)
+            raise e
+        except OSError as e:
+            logging.warning("health_config_path points to a nonexistent file: %s", e)
+            raise e
+
+        return ramp_down_trip_time
 
 
 @dataclass
