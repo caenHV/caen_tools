@@ -1,12 +1,11 @@
 import logging
 import time
-from caen_tools.SystemCheck.scripts.health import HealthControl
 from caen_tools.SystemCheck.scripts.receipts.listreceipts import PreparedReceipts
 from caen_tools.SystemCheck.utils.structures import CheckStatus
 from caen_tools.utils.receipt import ReceiptResponseError
 
 
-async def failure_actions(hc: HealthControl, status: CheckStatus) -> None:
+async def failure_actions(hc, status: CheckStatus) -> None:
     """A number of actions on failure"""
 
     logging.error("Bad device parameters. Emergency DownVoltage!", stack_info=True)
@@ -56,7 +55,7 @@ async def failure_actions(hc: HealthControl, status: CheckStatus) -> None:
 
 
 async def get_target_voltage(
-    hc: HealthControl,
+    hc,
 ) -> float | None:
     autopilot_status = await hc.cli.query(
         PreparedReceipts.get_autopilot_params(hc.SENDER), 1
@@ -68,7 +67,7 @@ async def get_target_voltage(
     return response.body["autopilot"].get("target_voltage", None)  # type: ignore
 
 
-async def reduce_voltage(hc: HealthControl, status: CheckStatus) -> None:
+async def reduce_voltage(hc, status: CheckStatus) -> None:
     """A number of actions on failure"""
 
     logging.error(
@@ -126,7 +125,7 @@ async def reduce_voltage(hc: HealthControl, status: CheckStatus) -> None:
     return
 
 
-async def setup_autopilot(hc: HealthControl) -> bool:
+async def setup_autopilot(hc) -> bool:
     target_voltage = await get_target_voltage(hc)
     if target_voltage is not None:
         autopilot_restart = await hc.cli.query(
@@ -148,7 +147,7 @@ async def setup_autopilot(hc: HealthControl) -> bool:
     return False
 
 
-async def check_and_increase(hc: HealthControl):
+async def check_and_increase(hc):
     """Checks that is the number of consecutive electrical breakdowns down is small and enough time from last breakdown elapsed.
     If it is the case, the function is doing the following:
         1) Set autopilot with the previous target.
@@ -182,7 +181,7 @@ async def check_and_increase(hc: HealthControl):
         await setup_autopilot(hc)
 
 
-async def check_and_restart(hc: HealthControl):
+async def check_and_restart(hc):
     """Checks that is the number of consecutive break down is small and enough time from last down elapsed.
     If it is the case, the function is doing the following:
         1) Reset channels
