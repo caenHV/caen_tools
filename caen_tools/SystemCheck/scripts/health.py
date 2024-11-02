@@ -22,6 +22,7 @@ from caen_tools.SystemCheck.utils.structures import (
 
 from caen_tools.connection.client import AsyncClient
 from caen_tools.utils.receipt import ReceiptResponseError
+from caen_tools.SystemCheck.utils.counter import CounterTTL
 
 from .metascript import Script
 from .mchswork import MChSWorker
@@ -57,6 +58,7 @@ class HealthControl(Script):
         self.dependent_scripts = stop_on_failure if stop_on_failure is not None else []
         self.__max_currents: dict[str, dict[str, float]] = max_currents
         self.__rdown_info: dict[str, RampDownInfo] = ramp_down_trip_time
+        self.__num_downs = CounterTTL(self.shared_parameters["allowed_down_window"])
 
     async def on_stop(self):
         self.mchs.pop_keystate(self.MCHS_KEY)
@@ -235,6 +237,7 @@ class HealthControl(Script):
         await self.cli.query(PreparedReceipts.reset_device(self.SENDER))
 
         self.shared_parameters["last_down"] = time.time()
+        self.__num_downs.increment(1)
         await self.cli.query(
             PreparedReceipts.sendlog(
                 self.SENDER,
@@ -251,23 +254,7 @@ class HealthControl(Script):
         return
 
     async def check_and_restart(self):
-        end_time = time.time()
-        start_time = end_time - self.shared_parameters["allowed_down_window"]
-        get_n_downs = await self.cli.query(
-            PreparedReceipts.get_last_downs(
-                self.SENDER, start_time=int(start_time), end_time=int(end_time)
-            )
-        )
-        if isinstance(get_n_downs.response, ReceiptResponseError):
-            logging.warning("Error from Monitor %s", get_n_downs.response)
-            self.form_answer(Codes.MONITOR_ERROR)
-            self.shared_parameters["last_down"] = None
-            self.shared_parameters["auto_restart"] = False
-            return
-
-        n_consecutive_downs = None
-        if get_n_downs.response.statuscode == 1:
-            n_consecutive_downs = int(get_n_downs.response.body)
+        n_consecutive_downs = self.__num_downs.count
 
         if (
             n_consecutive_downs is None
