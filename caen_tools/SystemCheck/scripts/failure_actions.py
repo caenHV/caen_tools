@@ -151,21 +151,35 @@ async def setup_autopilot(hc: HealthControl) -> bool:
 
 
 async def check_and_increase(hc: HealthControl):
+    """Checks that is the number of consecutive electrical breakdowns down is small and enough time from last breakdown elapsed.
+    If it is the case, the function is doing the following:
+        1) Set autopilot with the previous target.
+        2) reduced = None
+    If too many electrical breakdowns occurred in the breakdown_time_window:
+        1) reduced = None
+        2) last_down = now
+        3) Sends DownVoltage
+
+    Parameters
+    ----------
+    hc : HealthControl
+    """
+    if hc.shared_parameters["reduced"] is None:
+        return
+
     n_breakdowns = hc._num_breakdowns.count
-    if n_breakdowns is None or n_breakdowns > hc._n_allowed_downs:
+    if n_breakdowns > hc._n_allowed_downs:
         hc.shared_parameters["reduced"] = None
         if hc.shared_parameters["auto_restart"]:
             hc.shared_parameters["last_down"] = time.time()
         logging.warning(
-            "Too many electrical breakdowns (%s) in last %s seconds. Send DownVoltage. Autopilot will not be restarted.",
+            "Too many electrical breakdowns (%s) in last %s seconds. Send DownVoltage.",
             n_breakdowns,
             hc._breakdown_time_window,
         )
         await hc.cli.query(PreparedReceipts.down(hc.SENDER))
         return
-    if hc.shared_parameters["reduced"] is not None and (
-        time.time() - hc.shared_parameters["reduced"] > hc._reduce_period
-    ):
+    if time.time() - hc.shared_parameters["reduced"] > hc._reduce_period:
         hc.shared_parameters["reduced"] = None
         await setup_autopilot(hc)
 
@@ -175,15 +189,18 @@ async def check_and_restart(hc: HealthControl):
     If it is the case, the function is doing the following:
         1) Reset channels
         2) last_down = None
-        3)  set autopilot with the previous target.
+        3) Sets autopilot with the previous target.
 
     Parameters
     ----------
     hc : HealthControl
     """
+    if hc.shared_parameters["last_down"] is None:
+        return
+
     n_consecutive_downs = hc._num_downs.count
 
-    if n_consecutive_downs is None or n_consecutive_downs > hc._n_allowed_downs:
+    if n_consecutive_downs > hc._n_allowed_downs:
         hc.shared_parameters["last_down"] = None
         hc.shared_parameters["reduced"] = None
         hc.shared_parameters["auto_restart"] = False
@@ -199,9 +216,7 @@ async def check_and_restart(hc: HealthControl):
         hc.shared_parameters["last_down"],
         hc._auto_restart_after,
     )
-    if hc.shared_parameters["last_down"] is not None and (
-        time.time() - hc.shared_parameters["last_down"] > hc._auto_restart_after
-    ):
+    if time.time() - hc.shared_parameters["last_down"] > hc._auto_restart_after:
         await hc.cli.query(PreparedReceipts.reset_device(hc.SENDER))
         hc.shared_parameters["last_down"] = None
         await setup_autopilot(hc)
