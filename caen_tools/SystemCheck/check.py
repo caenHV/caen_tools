@@ -50,7 +50,6 @@ def main():
             shared_parameters,
             settings.get(CONFIG_SECTION, "device_backend"),
             settings.get(CONFIG_SECTION, "monitor"),
-            settings.get(CONFIG_SECTION, "system_check"),
             settings.get(CONFIG_SECTION, "interlock_db_uri"),
             hc_settings,
         ),
