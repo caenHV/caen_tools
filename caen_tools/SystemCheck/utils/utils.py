@@ -22,8 +22,7 @@ def parse_max_currents(health_config_path: Path) -> dict:
     return max_currents_map
 
 
-def fill_ramp_down_info(trip_time_map: dict) -> dict[str, RampDownInfo] | None:
-    rdown_info = None
+def fill_ramp_down_info(trip_time_map: dict) -> dict[str, RampDownInfo]:
     try:
         rdown_info = {
             ch: RampDownInfo(is_rdown=False, trip_time=float(trip_time))
@@ -37,10 +36,9 @@ def fill_ramp_down_info(trip_time_map: dict) -> dict[str, RampDownInfo] | None:
     return rdown_info
 
 
-def parse_trip_time(health_config_path: Path) -> dict[str, RampDownInfo] | None:
+def parse_trip_time(health_config_path: Path) -> dict[str, RampDownInfo]:
     """Opens health_check config and parses it to retrieve ramp down trip time map"""
 
-    ramp_down_trip_time = None
     try:
         with open(health_config_path, "r", encoding="utf-8") as f:
             ramp_down_trip_time = json.load(f)["ramp_down_trip_time"]

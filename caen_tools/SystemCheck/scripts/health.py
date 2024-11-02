@@ -14,13 +14,11 @@ from caen_tools.SystemCheck.scripts.failure_actions import (
     reduce_voltage,
 )
 from caen_tools.SystemCheck.utils.structures import (
-    Address,
     ChannelStatus,
     CheckStatus,
+    HealthControlSettings,
     RampDownInfo,
     ErrorCode,
-    ErrorDescription,
-    HealthParametersDict,
     CheckResult,
     Codes,
 )
@@ -42,30 +40,35 @@ class HealthControl(Script):
 
     def __init__(
         self,
-        shared_parameters: HealthParametersDict,
-        devback: Address,
-        monitor: Address,
-        check: Address,
-        mchs: MChSWorker,
-        max_currents: dict[str, dict[str, float | dict[str, float]]],
-        ramp_down_trip_time: dict[str, RampDownInfo],
+        settings: HealthControlSettings,
         stop_on_failure: list[Script] | None = None,
     ):
-        super().__init__(shared_parameters=shared_parameters)
+        super().__init__(shared_parameters=settings.shared_parameters)
         self.cli = AsyncClient(
             {
-                Services.MONITOR: monitor,
-                Services.DEVBACK: devback,
-                Services.CHECK: check,
+                Services.MONITOR: settings.monitor,
+                Services.DEVBACK: settings.devback,
+                Services.CHECK: settings.check,
             }
         )
-        self.mchs = mchs
+        self.mchs = settings.mchs
         self.dependent_scripts = stop_on_failure if stop_on_failure is not None else []
+        self._low_voltage_mlt: float = settings.low_voltage_mlt
         self.__max_currents: dict[str, dict[str, float | dict[str, float]]] = (
-            max_currents
+            settings.max_currents
         )
-        self.__rdown_info: dict[str, RampDownInfo] = ramp_down_trip_time
-        self._num_downs = CounterTTL(self.shared_parameters["allowed_down_window"])
+        self._rdown_info: dict[str, RampDownInfo] = settings.ramp_down_trip_time
+        self._allowed_down_window: float = settings.allowed_down_window
+        self._breakdown_time_window: float = settings.breakdown_time_window
+
+        # Setup Time expiring counters for emergency downs and electrical breakdowns.
+        self._num_downs = CounterTTL(self._allowed_down_window)
+        self._num_breakdowns = CounterTTL(self._breakdown_time_window)
+
+        self._n_allowed_downs: int = settings.n_allowed_downs
+        self._auto_restart_after: float = settings.auto_restart_after
+        self._reduce_period: float = settings.reduce_period
+        self._soft_reduce_mod: float = settings.soft_reduce_mod
 
     async def on_stop(self):
         self.mchs.pop_keystate(self.MCHS_KEY)
@@ -97,18 +100,17 @@ class HealthControl(Script):
     def _check_lowvolt(self, pars: dict) -> bool:
         """Checks if current defined voltage multiplier level is lower of a limit"""
 
-        low_voltage_mlt: float = self.shared_parameters["low_voltage_mlt"]
         cur_voltage_mlt: float = reduce(
             lambda x, y: x + y["VSet"], pars.values(), 0
         ) / reduce(lambda x, y: x + y["VDef"], pars.values(), 0)
 
         logging.debug(
             "Is low voltage defined: %s (%.3f, %.3f)",
-            cur_voltage_mlt <= low_voltage_mlt,
+            cur_voltage_mlt <= self._low_voltage_mlt,
             cur_voltage_mlt,
-            low_voltage_mlt,
+            self._low_voltage_mlt,
         )
-        return cur_voltage_mlt <= low_voltage_mlt
+        return cur_voltage_mlt <= self._low_voltage_mlt
 
     def _overall_checks(
         self, pars: dict
@@ -142,7 +144,7 @@ class HealthControl(Script):
                 case ChannelStatus(
                     ramp_down=True, voltage_problems=True
                 ) | ChannelStatus(ramp_down=True, soft_current_limit=True):
-                    ch_statuses[ch] = self.__rdown_info[ch].check_trip_time()
+                    ch_statuses[ch] = self._rdown_info[ch].check_trip_time()
                     if not ch_statuses[ch]:
                         logging.warning(f"Channel {ch} exceeded trip time.")
                 case ChannelStatus(voltage_problems=True) | ChannelStatus(
@@ -151,7 +153,7 @@ class HealthControl(Script):
                     logging.warning(
                         f"Channel {ch} is not in a ramp down but is in either over/under voltage or over current. It is on its last breath trip time."
                     )
-                    ch_statuses[ch] = self.__rdown_info[ch].check_trip_time()
+                    ch_statuses[ch] = self._rdown_info[ch].check_trip_time()
         try:
             bad_channels_errs = {
                 ch: ErrorCode.from_ChannelStatus(status)

@@ -12,6 +12,7 @@ from caen_tools.SystemCheck.scripts import (
     RelaxControl,
     ReducerControl,
 )
+from caen_tools.SystemCheck.utils.structures import HealthControlSettings
 from .utils import InterlockManager
 
 
@@ -19,10 +20,8 @@ def run_worker(
     shared_parameters: dict,
     devback_address: str,
     mon_address: str,
-    check_address: str,
     interlock_db_uri: str,
-    max_currents: dict,
-    ramp_down_trip_time: dict,
+    health_control_settings: HealthControlSettings,
 ):
     """Worker running different scenarios for system control"""
 
@@ -35,21 +34,19 @@ def run_worker(
     # A number of running scripts
     loader = LoaderControl(shared_parameters["loader"], devback_address, mon_address)
     interlock = InterlockControl(shared_parameters["interlock"], interlockdb, mchs)
-    relax = RelaxControl(shared_parameters["relax"], devback_address, mon_address, interlockdb)
-    reducer = ReducerControl(
-        shared_parameters["reducer"], devback_address, mon_address, interlockdb, mchs, relax
+    relax = RelaxControl(
+        shared_parameters["relax"], devback_address, mon_address, interlockdb
     )
-    health = HealthControl(
-        shared_parameters["health"],
+    reducer = ReducerControl(
+        shared_parameters["reducer"],
         devback_address,
         mon_address,
-        check_address,
+        interlockdb,
         mchs,
-        max_currents,
-        ramp_down_trip_time,
-        [relax, reducer],
+        relax,
     )
-
+    health_control_settings.mchs = mchs
+    health = HealthControl(health_control_settings, [relax, reducer])
     manager = ManagerScript([loader, interlock, relax, reducer, health])
 
     # Start manager and included scenarios

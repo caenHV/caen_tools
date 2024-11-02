@@ -8,6 +8,7 @@ import json
 import multiprocessing as mp
 
 from caen_tools.SystemCheck.server import run_server
+from caen_tools.SystemCheck.utils.structures import HealthControlSettings
 from caen_tools.SystemCheck.worker import run_worker
 from caen_tools.utils.utils import config_processor, get_logging_config
 from .utils import sharedmemo_fillup, parse_max_currents, parse_trip_time
@@ -39,17 +40,12 @@ def main():
     logging.info(
         "Start SysCheck with arguments %s", dict(settings.items(CONFIG_SECTION))
     )
-    max_currents = parse_max_currents(
-        settings.get(f"{CONFIG_SECTION}.health", "health_check_config_path")
-    )
-
-    ramp_down_trip_time = parse_trip_time(
-        settings.get(f"{CONFIG_SECTION}.health", "health_check_config_path")
-    )
 
     manager = mp.Manager()
     shared_parameters = sharedmemo_fillup(manager, settings, CONFIG_SECTION)
-
+    hc_settings = HealthControlSettings(
+        settings, CONFIG_SECTION, shared_parameters["health"]
+    )
     worker = mp.Process(
         target=run_worker,
         args=(
@@ -58,8 +54,7 @@ def main():
             settings.get(CONFIG_SECTION, "monitor"),
             settings.get(CONFIG_SECTION, "system_check"),
             settings.get(CONFIG_SECTION, "interlock_db_uri"),
-            max_currents,
-            ramp_down_trip_time,
+            hc_settings,
         ),
     )
     serv = mp.Process(

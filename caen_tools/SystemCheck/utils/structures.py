@@ -1,9 +1,13 @@
+from configparser import ConfigParser
 from dataclasses import InitVar, dataclass, field
 import logging
+import pathlib
 import time
 from typing import ClassVar, TypeAlias, TypedDict
 from enum import Enum, Flag, auto
 
+from caen_tools.SystemCheck.scripts.mchswork import MChSWorker
+from caen_tools.SystemCheck.utils.utils import parse_max_currents, parse_trip_time
 from caen_tools.utils.utils import get_timestamp
 
 # Alias for microservice connection_address "proto://host:port"
@@ -170,6 +174,63 @@ class SharedParametersDict(TypedDict):
     relax: RelaxParamsDict
     reducer: ReducerParametersDict
     mchs: MCHSDict
+
+
+@dataclass
+class HealthControlSettings:
+    shared_parameters: HealthParametersDict
+    devback: Address
+    monitor: Address
+    check: Address
+    mchs: MChSWorker
+    low_voltage_mlt: float
+    max_currents: dict[str, dict[str, float | dict[str, float]]]
+    ramp_down_trip_time: dict[str, RampDownInfo]
+    allowed_down_window: float
+    breakdown_time_window: float
+    n_allowed_downs: int
+    auto_restart_after: float
+    reduce_period: float
+    soft_reduce_mod: float
+
+    def __init__(self, settings: ConfigParser, section: str, shared_parameters):
+        self.shared_parameters = shared_parameters
+        self.devback = settings.get(section, "device_backend", fallback="")
+        self.monitor = settings.get(section, "monitor", fallback="")
+        self.check = settings.get(section, "system_check", fallback="")
+        # self.mchs to be added lately
+        self.low_voltage_mlt = settings.getfloat(section, "low_voltage_mlt", fallback=1)
+        if self.low_voltage_mlt < 0 or self.low_voltage_mlt > 1.2:
+            raise ValueError(
+                f"low_voltage_mlt parameter in section {section} must be between non-negative and smaller than 1.2"
+            )
+
+        self.max_currents = parse_max_currents(
+            pathlib.Path(settings.get(f"{section}.health", "health_check_config_path"))
+        )
+        self.ramp_down_trip_time = parse_trip_time(
+            pathlib.Path(settings.get(f"{section}.health", "health_check_config_path"))
+        )
+        self.allowed_down_window = settings.getfloat(
+            section, "allowed_down_window", fallback=0
+        )
+        self.breakdown_time_window = settings.getfloat(
+            section, "breakdown_time_window", fallback=0
+        )
+        self.n_allowed_downs = settings.getint(
+            section, "n_consecutive_downs", fallback=0
+        )
+        self.auto_restart_after = settings.getfloat(
+            section, "auto_restart_autopilot", fallback=0
+        )
+        self.reduce_period = settings.getfloat(section, "reduce_period", fallback=0)
+        self.soft_reduce_mod = settings.getfloat(
+            section, "soft_reduce_modifier", fallback=0
+        )
+        if self.soft_reduce_mod > 1 or self.soft_reduce_mod < 0:
+            raise ValueError(
+                f"soft_reduce_mod parameter in section {section} must be between 0 and 1."
+            )
 
 
 @dataclass
