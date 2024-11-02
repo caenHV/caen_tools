@@ -20,6 +20,7 @@ class Codes(Flag):
 
 class ErrorCode(Flag):
     OVERCURRENT = auto()
+    SOFT_OVERCURRENT = auto()
     BADVOLTAGE = auto()
     PARAMS = auto()
     MULTIPLE = auto()
@@ -36,6 +37,8 @@ class ErrorCode(Flag):
                 return ErrorCode.BADVOLTAGE
             case ChannelStatus(current_problems=True):
                 return ErrorCode.OVERCURRENT
+            case ChannelStatus(soft_current_limit=True):
+                return ErrorCode.SOFT_OVERCURRENT
             case _:
                 logging.warning("This place must be unreachable.")
                 return ErrorCode.CANT_READ
@@ -196,10 +199,12 @@ class ChannelStatus:
     multiple_problems: bool = field(init=False)
     bad_status: bool = field(init=False)
     voltage_problems: bool = field(init=False)
+
+    soft_current_limit: bool = field(init=False)
     current_problems: bool = field(init=False)
 
     current: InitVar[float]
-    max_current_config: InitVar[dict[str, float]]
+    max_current_config: InitVar[dict[str, float | dict[str, float]]]
 
     ramping_mask: ClassVar[list[str]] = ["ramp_up", "ramp_down"]
 
@@ -217,7 +222,9 @@ class ChannelStatus:
     voltage_mask: ClassVar[list[str]] = ["over_voltage", "under_voltage"]
     current_mask: ClassVar[list[str]] = ["over_current"]
 
-    def __post_init__(self, current: float, max_current_config: dict[str, float]):
+    def __post_init__(
+        self, current: float, max_current_config: dict[str, float | dict[str, float]]
+    ):
         self.is_ramping = any(
             [self.__getattribute__(stat) for stat in ChannelStatus.ramping_mask]
         )
@@ -230,15 +237,27 @@ class ChannelStatus:
 
         max_current_key = "volt_change" if self.is_ramping else "steady"
         max_current = max_current_config[max_current_key]
+
         self.current_problems = any(
             [self.__getattribute__(stat) for stat in ChannelStatus.current_mask]
-        ) or (current > max_current)
+        )
+        if max_current_key == "volt_change":
+            self.current_problems = self.current_problems or (current > max_current)  # type: ignore
+        else:
+            soft_limit, hard_limit = max_current["soft_limit"], max_current["hard_limit"]  # type: ignore
+            self.soft_current_limit = current > soft_limit
+            self.current_problems = self.current_problems or (current > hard_limit)
+
         problems = [self.bad_status, self.voltage_problems, self.current_problems]
         self.multiple_problems = len([x for x in problems if x == True]) > 1
         self.is_bad = any(problems)
 
     @staticmethod
-    def form(status: str, current: float, max_current_config: dict[str, float]):
+    def form(
+        status: str,
+        current: float,
+        max_current_config: dict[str, float | dict[str, float]],
+    ):
         """Creates an instance of ChannelStatus
 
         Parameters
@@ -248,9 +267,11 @@ class ChannelStatus:
             For more details read CAEN manuals (e.g. Manual for V6534 Rev9).
         current : float
             Current flowing through the channel
-        max_current_config : dict[str, float]
+        max_current_config : dict[str, float | dict[str, float]]
             Configuration of the eligible currents for the given channel in the following form:
-            {"volt_change" : max_current_change, "steady" : max_current_steady}
+            {"volt_change" : max_current_change, "steady" : {"soft_limit" : soft_limit, "hard_limit" : hard_limit}}
+            If current is over hard_limit, the current_problems is triggered.
+            If soft_limit < current < hard_limit, soft_current_limit is triggered.
 
         Returns
         -------
