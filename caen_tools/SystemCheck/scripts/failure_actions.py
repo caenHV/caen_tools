@@ -38,7 +38,7 @@ async def failure_actions(hc: HealthControl, status: CheckStatus) -> None:
     await hc.cli.query(PreparedReceipts.reset_device(hc.SENDER))
 
     hc.shared_parameters["last_down"] = time.time()
-    hc.__num_downs.increment(1)
+    hc._num_downs.increment(1)
     await hc.cli.query(
         PreparedReceipts.sendlog(
             hc.SENDER,
@@ -113,7 +113,7 @@ async def reduce_voltage(hc: HealthControl, status: CheckStatus) -> None:
 
     hc.shared_parameters["last_down"] = time.time()
     hc.shared_parameters["reduced"] = time.time()
-    hc.__num_downs.increment(1)
+    hc._num_downs.increment(1)
     await hc.cli.query(
         PreparedReceipts.sendlog(
             hc.SENDER,
@@ -153,7 +153,7 @@ async def setup_autopilot(hc: HealthControl) -> bool:
 
 
 async def check_and_increase(hc: HealthControl):
-    n_consecutive_downs = hc.__num_downs.count
+    n_consecutive_downs = hc._num_downs.count
     if (
         n_consecutive_downs is None
         or n_consecutive_downs > hc.shared_parameters["n_allowed_downs"]
@@ -187,7 +187,7 @@ async def check_and_restart(hc: HealthControl):
     ----------
     hc : HealthControl
     """
-    n_consecutive_downs = hc.__num_downs.count
+    n_consecutive_downs = hc._num_downs.count
 
     if (
         n_consecutive_downs is None

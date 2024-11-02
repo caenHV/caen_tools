@@ -65,7 +65,7 @@ class HealthControl(Script):
             max_currents
         )
         self.__rdown_info: dict[str, RampDownInfo] = ramp_down_trip_time
-        self.__num_downs = CounterTTL(self.shared_parameters["allowed_down_window"])
+        self._num_downs = CounterTTL(self.shared_parameters["allowed_down_window"])
 
     async def on_stop(self):
         self.mchs.pop_keystate(self.MCHS_KEY)
