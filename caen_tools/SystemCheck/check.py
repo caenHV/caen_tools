@@ -3,8 +3,6 @@ import argparse
 import logging
 import signal
 import os
-import pathlib
-import json
 import multiprocessing as mp
 
 from caen_tools.SystemCheck.server import run_server
