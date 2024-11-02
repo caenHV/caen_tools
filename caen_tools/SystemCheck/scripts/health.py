@@ -41,6 +41,7 @@ class HealthControl(Script):
     def __init__(
         self,
         settings: HealthControlSettings,
+        mchs: MChSWorker,
         stop_on_failure: list[Script] | None = None,
     ):
         super().__init__(shared_parameters=settings.shared_parameters)
@@ -51,7 +52,7 @@ class HealthControl(Script):
                 Services.CHECK: settings.check,
             }
         )
-        self.mchs = settings.mchs
+        self.mchs = mchs
         self.dependent_scripts = stop_on_failure if stop_on_failure is not None else []
         self._low_voltage_mlt: float = settings.low_voltage_mlt
         self.__max_currents: dict[str, dict[str, float | dict[str, float]]] = (

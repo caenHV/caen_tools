@@ -45,8 +45,7 @@ def run_worker(
         mchs,
         relax,
     )
-    health_control_settings.mchs = mchs
-    health = HealthControl(health_control_settings, [relax, reducer])
+    health = HealthControl(health_control_settings, mchs, [relax, reducer])
     manager = ManagerScript([loader, interlock, relax, reducer, health])
 
     # Start manager and included scenarios

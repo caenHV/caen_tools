@@ -6,7 +6,6 @@ import time
 from typing import ClassVar, TypeAlias, TypedDict
 from enum import Flag, auto
 
-from caen_tools.SystemCheck.scripts.mchswork import MChSWorker
 from caen_tools.utils.utils import get_timestamp
 
 # Alias for microservice connection_address "proto://host:port"
@@ -181,7 +180,6 @@ class HealthControlSettings:
     devback: Address
     monitor: Address
     check: Address
-    mchs: MChSWorker
     low_voltage_mlt: float
     max_currents: dict[str, dict[str, float | dict[str, float]]]
     ramp_down_trip_time: dict[str, RampDownInfo]
