@@ -78,18 +78,17 @@ async def reduce_voltage(hc: HealthControl, status: CheckStatus) -> None:
     for script in hc.dependent_scripts:
         script.stop()
 
-    # Send bad news on mchs
+    # Send bad news on mchs (read more about it here https://t.ly/_Ibe8)
     hc.send_mchs(False)
     target = await get_target_voltage(hc)
     if target is None:
-        logging.debug("target is None. Send Down Voltage Receipt", stack_info=True)
+        logging.debug(
+            "The voltage target is None. Send Down Voltage Receipt", stack_info=True
+        )
         await hc.cli.query(PreparedReceipts.down(hc.SENDER))
         return
 
-    logging.debug(
-        "Send Reduce Voltage Receipt",
-        stack_info=True,
-    )
+    logging.debug("Send Reduce Voltage Receipt", stack_info=True)
     reduce_voltage = await hc.cli.query(
         PreparedReceipts.set_voltage(hc.SENDER, target * hc._soft_reduce_mod)
     )
@@ -105,13 +104,12 @@ async def reduce_voltage(hc: HealthControl, status: CheckStatus) -> None:
     logging.info(
         "Send electrical breakdown status of the device: is_ok = %s, description = %s",
         False,
-        status.failure[1],  # type: ignore,
+        status.failure[1],
         stack_info=True,
     )
 
-    hc.shared_parameters["last_down"] = time.time()
     hc.shared_parameters["reduced"] = time.time()
-    hc._num_downs.increment(1)
+    hc._num_breakdowns.increment(1)
     await hc.cli.query(
         PreparedReceipts.sendlog(
             hc.SENDER,
