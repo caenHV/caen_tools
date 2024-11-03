@@ -348,6 +348,7 @@ class ChannelStatus:
         self.current_problems = any(
             [self.__getattribute__(stat) for stat in ChannelStatus.current_mask]
         )
+        self.soft_current_limit = False
         if max_current_key == "volt_change":
             self.current_problems = self.current_problems or (current > max_current)  # type: ignore
         else:
