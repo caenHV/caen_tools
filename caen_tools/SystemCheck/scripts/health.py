@@ -128,7 +128,9 @@ class HealthControl(Script):
             }
         except Exception as e:
             bad_channels = None
-            logging.warning("Something went wrong during channel check: %s", e)
+            logging.error(
+                "Something went wrong during channel check: %s", e, stack_info=True
+            )
         return bad_channels, statuses
 
     def _apply_trip_time_premium(
