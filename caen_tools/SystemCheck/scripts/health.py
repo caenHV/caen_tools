@@ -5,17 +5,20 @@ of current parameters on CAEN device
 from functools import reduce
 
 import logging
-import time
 import timeit
 
+from caen_tools.SystemCheck.scripts.failure_actions import (
+    check_and_increase,
+    check_and_restart,
+    failure_actions,
+    reduce_voltage,
+)
 from caen_tools.SystemCheck.utils.structures import (
-    Address,
     ChannelStatus,
     CheckStatus,
+    HealthControlSettings,
     RampDownInfo,
     ErrorCode,
-    ErrorDescription,
-    HealthParametersDict,
     CheckResult,
     Codes,
 )
@@ -37,28 +40,36 @@ class HealthControl(Script):
 
     def __init__(
         self,
-        shared_parameters: HealthParametersDict,
-        devback: Address,
-        monitor: Address,
-        check: Address,
+        settings: HealthControlSettings,
         mchs: MChSWorker,
-        max_currents: dict[str, dict[str, float]],
-        ramp_down_trip_time: dict[str, RampDownInfo],
         stop_on_failure: list[Script] | None = None,
     ):
-        super().__init__(shared_parameters=shared_parameters)
+        super().__init__(shared_parameters=settings.shared_parameters)
         self.cli = AsyncClient(
             {
-                Services.MONITOR: monitor,
-                Services.DEVBACK: devback,
-                Services.CHECK: check,
+                Services.MONITOR: settings.monitor,
+                Services.DEVBACK: settings.devback,
+                Services.CHECK: settings.check,
             }
         )
         self.mchs = mchs
         self.dependent_scripts = stop_on_failure if stop_on_failure is not None else []
-        self.__max_currents: dict[str, dict[str, float]] = max_currents
-        self.__rdown_info: dict[str, RampDownInfo] = ramp_down_trip_time
-        self.__num_downs = CounterTTL(self.shared_parameters["allowed_down_window"])
+        self._low_voltage_mlt: float = settings.low_voltage_mlt
+        self.__max_currents: dict[str, dict[str, float | dict[str, float]]] = (
+            settings.max_currents
+        )
+        self._rdown_info: dict[str, RampDownInfo] = settings.ramp_down_trip_time
+        self._allowed_down_window: float = settings.allowed_down_window
+        self._breakdown_time_window: float = settings.breakdown_time_window
+
+        # Setup Time expiring counters for emergency downs and electrical breakdowns.
+        self._num_downs = CounterTTL(self._allowed_down_window)
+        self._num_breakdowns = CounterTTL(self._breakdown_time_window)
+
+        self._n_allowed_downs: int = settings.n_allowed_downs
+        self._auto_restart_after: float = settings.auto_restart_after
+        self._reduce_period: float = settings.reduce_period
+        self._soft_reduce_mod: float = settings.soft_reduce_mod
 
     async def on_stop(self):
         self.mchs.pop_keystate(self.MCHS_KEY)
@@ -90,18 +101,17 @@ class HealthControl(Script):
     def _check_lowvolt(self, pars: dict) -> bool:
         """Checks if current defined voltage multiplier level is lower of a limit"""
 
-        low_voltage_mlt: float = self.shared_parameters["low_voltage_mlt"]
         cur_voltage_mlt: float = reduce(
             lambda x, y: x + y["VSet"], pars.values(), 0
         ) / reduce(lambda x, y: x + y["VDef"], pars.values(), 0)
 
         logging.debug(
             "Is low voltage defined: %s (%.3f, %.3f)",
-            cur_voltage_mlt <= low_voltage_mlt,
+            cur_voltage_mlt <= self._low_voltage_mlt,
             cur_voltage_mlt,
-            low_voltage_mlt,
+            self._low_voltage_mlt,
         )
-        return cur_voltage_mlt <= low_voltage_mlt
+        return cur_voltage_mlt <= self._low_voltage_mlt
 
     def _overall_checks(
         self, pars: dict
@@ -118,7 +128,9 @@ class HealthControl(Script):
             }
         except Exception as e:
             bad_channels = None
-            logging.warning("Something went wrong during channel check: %s", e)
+            logging.error(
+                "Something went wrong during channel check: %s", e, stack_info=True
+            )
         return bad_channels, statuses
 
     def _apply_trip_time_premium(
@@ -132,16 +144,19 @@ class HealthControl(Script):
                     current_problems=True
                 ):
                     ch_statuses[ch] = False
-                case ChannelStatus(ramp_down=True, voltage_problems=True):
-                    # Trip time logic is here
-                    ch_statuses[ch] = self.__rdown_info[ch].check_trip_time()
+                case ChannelStatus(
+                    ramp_down=True, voltage_problems=True
+                ) | ChannelStatus(ramp_down=True, soft_current_limit=True):
+                    ch_statuses[ch] = self._rdown_info[ch].check_trip_time()
                     if not ch_statuses[ch]:
                         logging.warning(f"Channel {ch} exceeded trip time.")
-                case ChannelStatus(voltage_problems=True):
+                case ChannelStatus(voltage_problems=True) | ChannelStatus(
+                    soft_current_limit=True
+                ):
                     logging.warning(
                         f"Channel {ch} is not in a ramp down but is in either over/under voltage or over current. It is on its last breath trip time."
                     )
-                    ch_statuses[ch] = self.__rdown_info[ch].check_trip_time()
+                    ch_statuses[ch] = self._rdown_info[ch].check_trip_time()
         try:
             bad_channels_errs = {
                 ch: ErrorCode.from_ChannelStatus(status)
@@ -208,104 +223,6 @@ class HealthControl(Script):
         self.mchs.send_state()
         return
 
-    async def failure_actions(self, status: CheckStatus) -> None:
-        """A number of actions on failure"""
-
-        logging.error("Bad device parameters. Emergency DownVoltage!")
-
-        for script in self.dependent_scripts:
-            script.stop()
-
-        # Send bad news on mchs
-        self.send_mchs(False)
-
-        logging.debug("Send Down Voltage Receipt")
-        down_voltage = await self.cli.query(PreparedReceipts.down(self.SENDER))
-        logging.info(
-            "Send emergency status of the device: is_ok = %s, description = %s",
-            False,
-            status.failure[1],  # type: ignore
-        )
-
-        if isinstance(down_voltage.response, ReceiptResponseError):
-            logging.error(
-                "Not sent DownVoltage Receipt (%s)! Try again...", down_voltage.response
-            )
-            down_voltage = await self.cli.query(PreparedReceipts.down(self.SENDER))
-            logging.info("Final response (%s)", down_voltage.response)
-
-        await self.cli.query(PreparedReceipts.reset_device(self.SENDER))
-
-        self.shared_parameters["last_down"] = time.time()
-        self.__num_downs.increment(1)
-        await self.cli.query(
-            PreparedReceipts.sendlog(
-                self.SENDER,
-                (
-                    f"{status.failure[0]}: {status.failure[1]}"
-                    if status is not None
-                    else "Down voltage due to bad device params (generic error)"
-                ),
-                True,
-            ),
-            receive_time=0.5,
-        )
-
-        return
-
-    async def check_and_restart(self):
-        n_consecutive_downs = self.__num_downs.count
-
-        if (
-            n_consecutive_downs is None
-            or n_consecutive_downs > self.shared_parameters["n_allowed_downs"]
-        ):
-            self.shared_parameters["last_down"] = None
-            self.shared_parameters["auto_restart"] = False
-            logging.warning(
-                "Too many emergency downs (%s) in last %s seconds. Autopilot will not be restarted.",
-                n_consecutive_downs,
-                self.shared_parameters["allowed_down_window"],
-            )
-            return
-
-        logging.debug(
-            "Last down timestamp is = %s, autorestart time = %s",
-            self.shared_parameters["last_down"],
-            self.shared_parameters["auto_restart_after"],
-        )
-        if self.shared_parameters["last_down"] is not None and (
-            time.time() - self.shared_parameters["last_down"]
-            > self.shared_parameters["auto_restart_after"]
-        ):
-            self.shared_parameters["last_down"] = None
-            autopilot_status = await self.cli.query(
-                PreparedReceipts.get_autopilot_params(self.SENDER), 1
-            )
-            if isinstance(autopilot_status.response, ReceiptResponseError):
-                logging.warning(
-                    "Problem with autopilot status %s", autopilot_status.response
-                )
-                return
-            target_voltage = autopilot_status.response.body["autopilot"].get(
-                "target_voltage", None
-            )
-            logging.info(f"target_voltage = {target_voltage}")
-
-            if target_voltage is not None:
-                autopilot_restart = await self.cli.query(
-                    PreparedReceipts.set_autopilot(self.SENDER, True, target_voltage), 1
-                )
-                if isinstance(autopilot_restart.response, ReceiptResponseError):
-                    logging.warning(
-                        "Problem with autopilot start %s", autopilot_restart.response
-                    )
-                    return
-                logging.info(
-                    "Autopilot was restarted after emergency down with target voltage = %s",
-                    target_voltage,
-                )
-
     async def __send_system_status(self):
         autopilot_status = await self.cli.query(
             PreparedReceipts.get_status_autopilot(self.SENDER)
@@ -358,13 +275,17 @@ class HealthControl(Script):
         params_dict = devback_params.response.body["params"]
         status: CheckStatus = self.perform_checks(params_dict)
 
-        if status.failure is not None:
-            await self.failure_actions(status)
-        else:
-            self.send_mchs(status.ack)
+        match status.failure:
+            case (ErrorCode.SOFT_OVERCURRENT, _):
+                await reduce_voltage(self, status)
+            case (err, _) if isinstance(err, ErrorCode):
+                await failure_actions(self, status)
+            case _:
+                self.send_mchs(status.ack)
 
         if self.shared_parameters["auto_restart"]:
-            await self.check_and_restart()
+            await check_and_restart(self)
+            await check_and_increase(self)
 
         exectime = timeit.default_timer() - starttime
         logging.info("HealthControl was done in %.3f s", exectime)
