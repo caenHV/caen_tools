@@ -1,9 +1,11 @@
 from functools import wraps
 from typing import List
+from email.message import EmailMessage
 
 import asyncio
 import json
 import logging
+import smtplib
 import subprocess
 
 from fastapi import HTTPException
@@ -42,22 +44,24 @@ def send_mail(addresses: List[str], subject: str, text: str) -> int:
 
     Notes
     -----
-    * for work need mail command in linux
+    * for work need mail smtp server
 
     """
 
-    body_str_encoded_to_byte = text.encode()
-    addresses = list(map(lambda x: x.strip(), addresses))
+    message = EmailMessage()
+    message.set_content(text)
+    message["Subject"] = subject
+    message["From"] = "notify@caendc.cmd"
+    message["To"] = ", ".join(addresses)
+
     if len(addresses) == 0:
         return 0
 
     logging.debug("Start sending mails to %s", addresses)
-    return_stat = subprocess.run(
-        ["mail", f"-s {subject}"] + addresses,
-        input=body_str_encoded_to_byte,
-        check=False,
-    )
-    logging.debug("Sent mail with status code %s", return_stat)
+    smtp_server = smtplib.SMTP("172.17.0.1:25")
+    smtp_server.send_message(message)
+    smtp_server.quit()
+    logging.debug("Sent mail")
     return 1
 
 
