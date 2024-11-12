@@ -71,6 +71,7 @@ class Services(Enum):
     DEVBACK = Service("device_backend", settings.get("ws", "device_backend"))
     MONITOR = Service("monitor", settings.get("ws", "monitor"))
     SYSCHECK = Service("system_check", settings.get("ws", "system_check"))
+    INTERLOCK = Service("interlock", settings.get("ws", "interlock"))
 
 
 tags_metadata = [
@@ -130,8 +131,8 @@ async def last_scream() -> None:
     return
 
 
-@app.get("/")
-@app.get("/log")
+@app.get("/", include_in_schema=False)
+@app.get("/log", include_in_schema=False)
 async def read_root():
     """Redirect on frontend page"""
     return FileResponse(os.path.join(root, "frontend", "build", "index.html"))
@@ -616,6 +617,92 @@ async def set_interlock_follow(
     return resp
 
 
+# Interlock API routes
+
+
+@alru_cache(ttl=1)
+async def interlock_status(
+    sender: str = "webcli", receive_time: float | None = None
+) -> Receipt:
+    """Cached interlock status"""
+    logging.info("Start interlock/status")
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.INTERLOCK.title,
+        title="status",
+        params={},
+    )
+    resp = await cli.query(receipt, receive_time)
+    return resp
+
+
+@app.get(f"/{Services.INTERLOCK.title}/status", tags=[Services.INTERLOCK.title])
+@response_provider
+async def get_interlock_status(
+    sender: Annotated[str, Query(max_length=50)] = "webcli"
+) -> Receipt:
+    """[API] Gets microservice status and current settings"""
+
+    resp = await interlock_status(sender)
+    return resp
+
+
+@app.get(f"/{Services.INTERLOCK.title}/get_value", tags=[Services.INTERLOCK.title])
+@response_provider
+async def get_interlock_value(
+    sender: Annotated[str, Query(max_length=50)] = "webcli"
+) -> Receipt:
+    """[API] Gets interlock value"""
+
+    logging.info("Start interlock/get_value")
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.INTERLOCK.title,
+        title="get_value",
+        params={},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+@app.post(f"/{Services.INTERLOCK.title}/set_value", tags=[Services.INTERLOCK.title])
+@response_provider
+async def set_interlock_value(
+    value: Annotated[bool, Body()],
+    sender: Annotated[str, Body(max_length=50)] = "webcli",
+) -> Receipt:
+    """[API] Sets interlock value (for manual mode only)"""
+
+    logging.info("Start interlock/set_value")
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.INTERLOCK.title,
+        title="set_value",
+        params={"value": value},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
+@app.post(f"/{Services.INTERLOCK.title}/set_mode", tags=[Services.INTERLOCK.title])
+@response_provider
+async def set_interlock_mode(
+    value: Annotated[int, Body(ge=0, le=1)],
+    sender: Annotated[str, Body(max_length=50)] = "webcli",
+) -> Receipt:
+    """[API] Sets interlock mode (0: manual mode, 1: socket mode)"""
+
+    logging.info("Start interlock/set_mode")
+    receipt = Receipt(
+        sender=sender,
+        executor=Services.INTERLOCK.title,
+        title="set_mode",
+        params={"mode": value},
+    )
+    resp = await cli.query(receipt)
+    return resp
+
+
 # Events stream
 
 
@@ -633,11 +720,13 @@ async def devback_status_broadcast() -> EventSourceResponse:
             devback = tg.create_task(devback_status(sender, rcv_time))
             monitor = tg.create_task(monitor_status(sender, rcv_time))
             syscheck = tg.create_task(syscheck_status(sender, rcv_time))
+            interlock = tg.create_task(interlock_status(sender, rcv_time))
 
         response = {
             Services.DEVBACK.title: devback.result().response,
             Services.MONITOR.title: monitor.result().response,
             Services.SYSCHECK.title: syscheck.result().response,
+            Services.INTERLOCK.title: interlock.result().response,
         }
         return response
 

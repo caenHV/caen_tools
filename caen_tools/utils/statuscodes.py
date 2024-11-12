@@ -1,0 +1,12 @@
+from enum import IntEnum
+
+
+class StatusCode(IntEnum):
+    """Enum of typical status code"""
+
+    SUCCESS = 200
+    BAD_REQUEST = 400
+    NOT_FOUND = 404
+    FORBIDDEN = 403
+    NOT_ALLOWED = 405
+    UNAVAILABLE = 503

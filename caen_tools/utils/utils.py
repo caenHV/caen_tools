@@ -1,9 +1,12 @@
 """Small utility helpful functions"""
 
+from argparse import Namespace
 from pathlib import Path
 
+import argparse
 import configparser
 import time
+import timeit
 import logging
 from logging.config import dictConfig
 from datetime import datetime
@@ -106,3 +109,48 @@ def get_logging_config(
     )
     logging.debug("Set logging settings")
     return
+
+
+def argparser(description: str) -> Namespace:
+    """Default console argparser
+
+    Parameters
+    ----------
+    description: str
+        argparser description
+    """
+
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument(
+        "-c",
+        "--config",
+        required=False,
+        type=argparse.FileType("r"),
+        help="Config file path",
+        nargs="?",
+    )
+    args = parser.parse_args()
+    return args
+
+
+class Timer:
+    """Measures execution time of the selected code part
+    and sends it in logging WARNING
+
+    Examples
+    --------
+    with Timer("program") as t:
+        ...some code...
+    """
+
+    def __init__(self, title: str = ""):
+        self._title = title
+        self.start = None
+
+    def __enter__(self):
+        self.start = timeit.default_timer()
+        return self
+
+    def __exit__(self, *args):
+        elapsed = timeit.default_timer() - self.start
+        logging.warning("%s executed in %.4fs", self._title, elapsed)

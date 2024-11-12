@@ -45,7 +45,6 @@ class AsyncClient(BaseClient):
     def __init__(self, connect_addresses: Dict[str, str], receive_time: int = 20):
         logging.debug("Start AsyncCli initialization")
         context = zmq.asyncio.Context()
-        self.socket = context.socket(zmq.DEALER)
         self.connect_addresses = connect_addresses
         super().__init__(context, int(receive_time))
 
@@ -123,14 +122,14 @@ class AsyncStreamClient(BaseClient):
 
     async def query(self, connect_address: str, message: bytes) -> list[bytes] | None:
         """Sends a query to some address and receives the answer
-        
+
         Parameters
         ----------
         connect_address: str
             address like: "protocol://host:port"
         message: bytes
             sending message
-        
+
         Returns
         -------
         list[bytes] | None
@@ -145,13 +144,9 @@ class AsyncStreamClient(BaseClient):
             await sock.send(id_sock, zmq.SNDMORE)
             await sock.send(message)
 
-            answer = None
-            try:
-                _ = await sock.recv_multipart()
-                answer = await sock.recv_multipart()
-                logging.debug("Received answer %s (from %s)", answer, connect_address)
-            except zmq.error.Again:
-                logging.warning("No response from %s", connect_address, exc_info=True)
+            _ = await sock.recv_multipart()
+            answer = await sock.recv_multipart()
+            logging.debug("Received answer %s (from %s)", answer, connect_address)
 
         s.setsockopt(zmq.LINGER, 0)
         s.close()

@@ -6,7 +6,6 @@ import asyncio
 import json
 import logging
 import smtplib
-import subprocess
 
 from fastapi import HTTPException
 from caen_tools.utils.receipt import ReceiptResponseError
