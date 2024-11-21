@@ -1,0 +1,91 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: none
+  PACKAGE_NAME: "caen_tools"
+  AUTO_TAG: "v0.0.$CI_PIPELINE_IID"
+  FRONTEND_BUILD_URI: "https://git.inp.nsk.su/api/v4/projects/cmd3%2Fcaendc%2Ffrontend/jobs/3556/artifacts/build.tar.gz"
+
+stages:
+  - build
+  - release
+  - deploy
+
+build_wheel:
+  stage: build
+  image: python:3.11-alpine
+  before_script:
+    - apk add curl
+  script:
+    - ls -lh
+    - |
+      cd caen_tools/WebService/frontend
+      curl --location --output build.tar.gz --header "JOB-TOKEN: $CI_JOB_TOKEN" "$FRONTEND_BUILD_URI"
+      ls -lh
+      tar -xvzf build.tar.gz
+      rm build.tar.gz
+      cd -
+    - ls -lh caen_tools/WebService/frontend
+    - python3 -m pip install --upgrade build
+    - python3 -m build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 hour
+
+badge_doc_cover:
+  stage: build
+  image: python:3.11-alpine
+  before_script:
+    - echo "Install python dependencies"
+    - pip install anybadge interrogate==1.7.0
+  script:
+    - ls
+    - interrogate -m -n -p -vv caen_tools -f 0 -o docs_coverage.txt
+    - cat docs_coverage.txt
+    - covlevel=$(tail -n 1 docs_coverage.txt | cut -d " " -f7 | cut -d "%" -f1)
+    - anybadge -l "Docs coverage" -v "$covlevel" --suffix='%' -f docs_coverage.svg 50=red 60=orange 80=yellow 100=green
+  artifacts:
+    paths:
+      - docs_coverage.svg
+      - docs_coverage.txt
+    expire_in: never
+
+upload_package:
+  stage: release
+  image: python:3.11-alpine
+  variables:
+    TWINE_USERNAME: "gitlab-ci-token"
+    TWINE_PASSWORD: "$CI_JOB_TOKEN"
+  needs:
+    - job: build_wheel
+      artifacts: true
+  script:
+    - ls -lh
+    - echo "$TWINE_USERNAME $TWINE_PASSWORD"
+    - pip install twine
+    - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "release"
+    - when: manual
+      allow_failure: true
+
+release_job:
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  stage: release
+  needs:
+    - job: build_wheel
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_TAG
+  script: echo "Release job"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: 'Release $CI_COMMIT_TAG'
+    description: 'Auto release with Gitlab CI'
+
+deploy_job:
+  stage: deploy
+  image: alpine:latest
+  needs: ['upload_package']
+  when: manual
+  script: echo "Mock deploy"
+  environment: development
