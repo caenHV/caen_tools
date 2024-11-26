@@ -2,6 +2,12 @@ variables:
   GIT_SUBMODULE_STRATEGY: none
   FRONTEND_BUILD_URI: "https://git.inp.nsk.su/api/v4/projects/cmd3%2Fcaendc%2Ffrontend/jobs/3556/artifacts/build.tar.gz"
 
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG 
+      when: never
+    - when: always
+
 stages:
   - build
   - release
@@ -64,12 +70,37 @@ upload_package:
     - |
       PACKAGE_VERSION=$(python -c "from glob import glob; print(glob('dist/*.whl')[0].split('-')[1])")
       echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> package.env
+    - |
+      WHL_URI=$(sha256sum dist/*.whl | sed 's/ \+dist//g')
+      echo "WHL_URI=$WHL_URI" >> package.env
+      TAR_URI=$(sha256sum dist/*.tar.gz | sed 's/ \+dist//g')
+      echo "TAR_URI=$TAR_URI" >> package.env
+      cat package.env
   artifacts:
     reports:
       dotenv: package.env
   rules:
     - if: $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "release"
     - when: manual
+
+prepare_release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: upload_package
+      artifacts: true
+  script:
+    - echo "Prepare package release"
+  release:
+    tag_name: $PACKAGE_VERSION
+    name: 'Release $PACKAGE_VERSION'
+    description: 'Gitlab CI/CD auto release'
+    assets:
+      links:
+        - name: ".whl direct link"
+          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi/files/${WHL_URI}'
+        - name: ".tar.gz direct link"
+          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi/files/${TAR_URI}'
 
 deploy_development:
   stage: deploy
